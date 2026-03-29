@@ -15,15 +15,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -38,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.vild.shared.VibeConstants
+import com.example.vild.ui.PresetSection
 import com.example.vild.ui.SnoozeSection
 import com.example.vild.ui.VibrationSection
 import com.example.vild.ui.theme.VILDTheme
@@ -59,6 +63,8 @@ class MainActivity : ComponentActivity() {
 fun VildApp(vm: MainViewModel = viewModel()) {
     val settings by vm.settings.collectAsState()
     val nodes by vm.nodes.collectAsState()
+    val syncStatus by vm.syncStatus.collectAsState()
+    val activeMode by vm.activeMode.collectAsState()
 
     Scaffold(
         topBar = {
@@ -73,7 +79,9 @@ fun VildApp(vm: MainViewModel = viewModel()) {
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Spacer(Modifier.height(8.dp))
+            SyncStatusBar(syncStatus = syncStatus)
+
+            DayNightToggle(activeMode = activeMode, onToggle = { vm.toggleMode() })
 
             // ── Master toggle ────────────────────────────────────────────────
             SectionLabel("Reminders")
@@ -135,6 +143,12 @@ fun VildApp(vm: MainViewModel = viewModel()) {
 
             HorizontalDivider()
 
+            // ── Presets ──────────────────────────────────────────────────────
+            SectionLabel("Presets")
+            PresetSection(vm = vm)
+
+            HorizontalDivider()
+
             // ── Snooze ───────────────────────────────────────────────────────
             SectionLabel("Snooze")
             SnoozeSection(settings = settings, vm = vm)
@@ -145,6 +159,93 @@ fun VildApp(vm: MainViewModel = viewModel()) {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * A two-button segmented toggle for switching between Day (☀️) and Night (🌙) modes.
+ * The active mode button is filled; the inactive one is outlined.
+ */
+@Composable
+private fun DayNightToggle(activeMode: String, onToggle: () -> Unit) {
+    val isDay = activeMode == "day"
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (isDay) {
+            Button(
+                onClick = {},
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("☀️  Day")
+            }
+            OutlinedButton(
+                onClick = onToggle,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("🌙  Night")
+            }
+        } else {
+            OutlinedButton(
+                onClick = onToggle,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("☀️  Day")
+            }
+            Button(
+                onClick = {},
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                ),
+            ) {
+                Text("🌙  Night")
+            }
+        }
+    }
+}
+
+
+/**
+ * A slim banner shown at the top of the content area indicating the last sync result.
+ *
+ * - Never synced: hidden (no banner shown).
+ * - Last sync succeeded: green tint + "✓ Synced X sec ago".
+ * - Last sync failed: error tint + "✗ Sync failed".
+ */
+@Composable
+private fun SyncStatusBar(syncStatus: SyncStatus) {
+    if (syncStatus.lastSyncTimestamp == 0L) return
+
+    val secondsAgo = ((System.currentTimeMillis() - syncStatus.lastSyncTimestamp) / 1_000).toInt()
+    val label = if (syncStatus.lastSyncSuccess) {
+        "✓ Synced ${secondsAgo}s ago"
+    } else {
+        "✗ Sync failed"
+    }
+    val containerColor = if (syncStatus.lastSyncSuccess) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.errorContainer
+    }
+    val contentColor = if (syncStatus.lastSyncSuccess) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onErrorContainer
+    }
+
+    Surface(
+        color = containerColor,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+    }
+}
 
 @Composable
 private fun SectionLabel(text: String) {

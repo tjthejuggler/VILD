@@ -1,17 +1,20 @@
 # VILD – System Patterns
 
-> Last updated: 2026-03-29T15:16 UTC-6
+> Last updated: 2026-03-29T15:48 UTC-6
 
 ## Architecture Overview
 
 ```mermaid
 graph TD
     subgraph Phone
+        DayNightToggle[Day/Night Toggle]
         UI[MainActivity - Compose UI]
         VibSec[VibrationSection - Compose]
         SnoozeSec[SnoozeSection - Compose]
+        PresetSec[PresetSection - Compose - PLANNED]
         VM[MainViewModel]
         Repo[AppSettingsRepository - DataStore]
+        PresetStore[Preset Storage - DataStore JSON - PLANNED]
         Sync[WearSyncManager - DataClient + MessageClient]
     end
 
@@ -27,13 +30,17 @@ graph TD
         VibHelp[VibrationHelper - vibration logic]
     end
 
+    DayNightToggle -->|toggle mode| VM
     UI --> VM
     VibSec --> VM
     SnoozeSec --> VM
+    PresetSec -->|save/load/delete| VM
     VM --> Repo
+    VM --> PresetStore
     VM --> Sync
     Sync -->|DataClient.putDataItem| Listener
     Sync -->|MessageClient.sendMessage| Listener
+    Sync -->|returns success/fail| VM
     Listener --> WRepo
     Listener --> Sched
     Listener -->|vibrate now| VibHelp
@@ -88,21 +95,45 @@ Before scheduling an alarm, `VibeScheduler.isThisNodeTargeted()` checks:
 - **Phone side**: Uses Jetpack DataStore Preferences (reactive `Flow`-based API).
 - **Watch side**: Uses plain `SharedPreferences` (simpler, synchronous reads needed by `VibeReceiver`).
 
-### 8. Dual Communication Channels - NEW
+### 8. Dual Communication Channels
 
 - **DataClient** (`putDataItem`) — for persistent settings that must survive disconnections. Used for all configuration (intensity, frequency, snooze, pattern, etc.).
 - **MessageClient** (`sendMessage`) — for fire-and-forget commands. Used for the "Vibrate Now" one-shot command. Does not persist; requires the watch to be connected.
 
-### 9. Extracted VibrationHelper - NEW
+### 9. Extracted VibrationHelper
 
 Vibration logic is extracted from `VibeReceiver` into a standalone `VibrationHelper` object. This allows both scheduled vibrations (from `VibeReceiver`) and immediate vibrations (from `VibeDataListenerService.onMessageReceived()`) to share the same pattern/intensity/duration logic.
 
-### 10. UI Decomposition - NEW
+### 10. UI Decomposition
 
 The phone Compose UI is split into focused composable files to keep each under 500 lines:
 - `MainActivity.kt` — scaffold, master toggle, node selector, frequency sliders
 - `ui/VibrationSection.kt` — intensity, duration, pattern, repeat, Vibrate Now button
 - `ui/SnoozeSection.kt` — countdown, default snooze buttons, custom snooze management
+- `ui/PresetSection.kt` — preset save/load/delete UI (PLANNED)
+
+### 11. Named Presets — PLANNED
+
+Presets capture a snapshot of all vibration/scheduling settings (excluding transient state like snooze timestamp and target node). Stored as a JSON array in DataStore under a single key. Uses `kotlinx.serialization` for serialization.
+
+Key design decisions:
+- Presets are **phone-only** — the watch is unaware of presets.
+- Loading a preset applies its values to the current settings and syncs to the watch.
+- Preset names must be unique; saving with an existing name overwrites.
+
+### 12. Day/Night Mode — PLANNED
+
+Two independent sets of settings stored as JSON in DataStore under `day_settings_json` and `night_settings_json` keys. A single `active_mode` key tracks which is active.
+
+Key design decisions:
+- The **watch is unaware** of Day/Night mode — it just receives whatever settings are currently active.
+- Toggling mode saves current settings under the outgoing mode, loads the incoming mode's settings, and syncs to the watch.
+- Presets can be loaded into either mode — just toggle to the desired mode first, then load the preset.
+- Default mode is `"day"` on first launch.
+
+### 13. Sync Status Tracking — PLANNED
+
+`WearSyncManager.pushSettings()` returns a Boolean success/failure result. The ViewModel tracks the last sync timestamp and success state in a `SyncStatus` data class exposed as a `StateFlow`. The UI displays this as a small indicator near the top of the screen.
 
 ## File Organization
 
@@ -114,22 +145,25 @@ VILD/
 │       ├── MainViewModel.kt      # UI state + coordination
 │       ├── data/
 │       │   ├── AppSettingsRepository.kt  # DataStore persistence
-│       │   └── WearSyncManager.kt        # Data Layer push + MessageClient
+│       │   ├── WearSyncManager.kt        # Data Layer push + MessageClient
+│       │   └── Preset.kt                 # Preset data class (PLANNED)
 │       └── ui/
-│           ├── VibrationSection.kt       # Vibration settings composables - NEW
-│           ├── SnoozeSection.kt          # Snooze composables - NEW
+│           ├── VibrationSection.kt       # Vibration settings composables
+│           ├── SnoozeSection.kt          # Snooze composables
+│           ├── PresetSection.kt          # Preset management UI (PLANNED)
 │           └── theme/                    # Material 3 theme
 ├── wear/                         # Wear OS worker - com.example.vild.wear
 │   └── src/main/java/.../wear/
-│       ├── MainActivity.kt               # Minimal launcher - calls finish
+│       ├── MainActivity.kt               # Minimal Compose UI
 │       ├── VibeDataListenerService.kt    # Data Layer + Message listener
 │       ├── VibeSettingsRepository.kt     # SharedPreferences storage
 │       ├── VibeScheduler.kt              # AlarmManager scheduling
 │       ├── VibeReceiver.kt               # Alarm handler - delegates to VibrationHelper
-│       └── VibrationHelper.kt            # Vibration logic with patterns - NEW
+│       └── VibrationHelper.kt            # Vibration logic with patterns
 ├── shared/                       # Shared library - com.example.vild.shared
 │   └── src/main/java/.../shared/
 │       └── VibeConstants.kt              # Paths and keys
+├── memory-bank/                  # Project documentation
 └── plans/
     └── new-features-plan.md              # Detailed implementation plan
 ```

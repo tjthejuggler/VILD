@@ -47,9 +47,11 @@ class WearSyncManager(private val context: Context) {
      *
      * [setUrgent] is called so the item is delivered immediately rather than
      * being batched, which is important for real-time setting changes.
+     *
+     * @return `true` if the push succeeded, `false` if an exception was thrown.
      */
-    suspend fun pushSettings(settings: VibeSettings) {
-        try {
+    suspend fun pushSettings(settings: VibeSettings): Boolean {
+        return try {
             val request = PutDataMapRequest.create(VibeConstants.PATH_VIBE_SETTINGS).apply {
                 dataMap.putBoolean(VibeConstants.KEY_IS_ENABLED, settings.isEnabled)
                 dataMap.putInt(VibeConstants.KEY_FREQ_MIN_MINUTES, settings.freqMinMinutes)
@@ -64,8 +66,10 @@ class WearSyncManager(private val context: Context) {
 
             Wearable.getDataClient(context).putDataItem(request).await()
             Log.d(TAG, "Settings pushed to Data Layer: $settings")
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to push settings to Data Layer", e)
+            false
         }
     }
 

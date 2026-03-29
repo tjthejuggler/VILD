@@ -4,7 +4,24 @@
             "outputFile": "com.example.vild.wear-mergeDebugResources-40:/values-en-rXC/values-en-rXC.xml",
             "map": [
                 {
-                    "source": "/home/twain/.gradle/caches/8.13/transforms/fc7d0b51412d459be63f95fac4eac640/transformed/core-1.18.0/res/values-en-rXC/values-en-rXC.xml",
+                    "source": "/home/twain/.gradle/caches/8.13/transforms/0a76362703173ee791da722c85ae0c60/transformed/foundation-release/res/values-en-rXC/values-en-rXC.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,243",
+                        "endColumns": "187,186",
+                        "endOffsets": "238,425"
+                    },
+                    "to": {
+                        "startLines": "29,30",
+                        "startColumns": "4,4",
+                        "startOffsets": "5277,5465",
+                        "endColumns": "187,186",
+                        "endOffsets": "5460,5647"
+                    }
+                },
+                {
+                    "source": "/home/twain/.gradle/caches/8.13/transforms/bd414e065ba8dc39b108c01d1f8a9667/transformed/core-1.18.0/res/values-en-rXC/values-en-rXC.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",
@@ -21,7 +38,7 @@
                     }
                 },
                 {
-                    "source": "/home/twain/.gradle/caches/8.13/transforms/45f61551ae0f1e68168c2397154b02d2/transformed/ui-release/res/values-en-rXC/values-en-rXC.xml",
+                    "source": "/home/twain/.gradle/caches/8.13/transforms/a7364ac8380becc96a24f78901035f45/transformed/ui-release/res/values-en-rXC/values-en-rXC.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -35,23 +52,6 @@
                         "startOffsets": "1532,1723,1908,2105,2307,2494,2679,2872,3060,3247,3428,3613,3779,3965,4143,4318,4693,4872,5039",
                         "endColumns": "190,184,196,201,186,184,192,187,186,180,184,165,185,177,174,170,178,166,237",
                         "endOffsets": "1718,1903,2100,2302,2489,2674,2867,3055,3242,3423,3608,3774,3960,4138,4313,4484,4867,5034,5272"
-                    }
-                },
-                {
-                    "source": "/home/twain/.gradle/caches/8.13/transforms/98a4359d7c6bae9e6be15901b78a7c3d/transformed/foundation-release/res/values-en-rXC/values-en-rXC.xml",
-                    "from": {
-                        "startLines": "2,3",
-                        "startColumns": "4,4",
-                        "startOffsets": "55,243",
-                        "endColumns": "187,186",
-                        "endOffsets": "238,425"
-                    },
-                    "to": {
-                        "startLines": "29,30",
-                        "startColumns": "4,4",
-                        "startOffsets": "5277,5465",
-                        "endColumns": "187,186",
-                        "endOffsets": "5460,5647"
                     }
                 }
             ]

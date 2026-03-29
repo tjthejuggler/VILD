@@ -56,8 +56,8 @@ fun VibrationSection(settings: VibeSettings, vm: MainViewModel) {
     Slider(
         value = settings.vibrationDurationMs.toFloat(),
         onValueChange = { vm.updateVibrationDurationMs(it.toLong()) },
-        valueRange = 100f..2000f,
-        steps = 37, // 50 ms steps: (2000-100)/50 - 1 = 37
+        valueRange = 100f..4000f,
+        steps = 77, // 50 ms steps: (4000-100)/50 - 1 = 77
         modifier = Modifier.fillMaxWidth(),
     )
 

@@ -1,248 +1,334 @@
-# VILD New Features – Implementation Plan
+# VILD New Features – Implementation Plan (v2)
 
-> Created: 2026-03-29T15:14 UTC-6
+> Created: 2026-03-29T15:46 UTC-6
 
-## Answer to User Question: Watch App Launcher Behavior
+## User Questions – Answers
 
-**Yes, the watch app is intentionally headless.** The [`wear/src/main/AndroidManifest.xml`](wear/src/main/AndroidManifest.xml) does declare a launcher activity (lines 18–25):
+### How does syncing work? Does the watch remember settings?
 
-```xml
-<activity android:name=".MainActivity" android:exported="true">
-    <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
-        <category android:name="android.intent.category.LAUNCHER" />
-    </intent-filter>
-</activity>
-```
+**The Android Wear Data Layer auto-syncs.** When you change a setting on the phone, [`MainViewModel.updateAndSync()`](app/src/main/java/com/example/vild/MainViewModel.kt:166) saves it locally via [`AppSettingsRepository`](app/src/main/java/com/example/vild/data/AppSettingsRepository.kt:22) AND pushes the full settings snapshot to the Wearable Data Layer via [`WearSyncManager.pushSettings()`](app/src/main/java/com/example/vild/data/WearSyncManager.kt:51). The Data Layer uses `DataClient.putDataItem()` with `setUrgent()`, which delivers immediately to all connected watches. If a watch is offline, the Data Layer **queues** the update and delivers it automatically when the watch reconnects.
 
-However, [`wear/src/main/java/com/example/vild/wear/MainActivity.kt`](wear/src/main/java/com/example/vild/wear/MainActivity.kt:11) immediately calls `finish()` in `onCreate()` — it exists solely so Android Studio can deploy the APK via a run configuration. The real work is done by [`VibeDataListenerService`](wear/src/main/java/com/example/vild/wear/VibeDataListenerService.kt:16) (a `WearableListenerService` that wakes up when the phone pushes settings) and [`VibeReceiver`](wear/src/main/java/com/example/vild/wear/VibeReceiver.kt:22) (a `BroadcastReceiver` fired by `AlarmManager`).
+**Yes, the watch remembers settings.** On the watch side, [`VibeDataListenerService.onDataChanged()`](wear/src/main/java/com/example/vild/wear/VibeDataListenerService.kt:25) receives the update and persists it to [`VibeSettingsRepository`](wear/src/main/java/com/example/vild/wear/VibeSettingsRepository.kt:11) (SharedPreferences). The watch operates autonomously from that point — it does not need the phone to be connected to vibrate on schedule.
 
-**So yes — the watch app runs entirely in the background. The whole interface is through the phone app.** After sideloading via ADB, you won't see a persistent app icon or UI on the watch. The app activates when the phone companion pushes settings via the Wearable Data Layer.
+**What we will add:** A sync status indicator in the phone UI showing whether the last push succeeded or failed, and the timestamp of the last successful sync.
+
+### Can intensity go above 255?
+
+**No — 255 is the Android hardware limit.** The `VibrationEffect` API uses an `int` amplitude parameter clamped to 1–255, where 255 is the maximum the motor can produce. This is an OS-level constraint, not a VILD limitation. The slider in [`VibrationSection.kt`](app/src/main/java/com/example/vild/ui/VibrationSection.kt:43) already enforces `valueRange = 1f..255f`.
+
+### Can the duration slider max be increased to 4000?
+
+**Yes.** The current max is 2000ms in [`VibrationSection.kt`](app/src/main/java/com/example/vild/ui/VibrationSection.kt:59). We will increase it to 4000ms.
 
 ---
 
 ## New Features Overview
 
-### Feature A: Immediate Vibrate Button
-A button on the phone that sends an immediate vibration command to the watch using the currently configured intensity and pattern.
+### Feature 1: Sync Status Indicator
+Show sync state in the phone UI — last sync timestamp and success/failure status.
 
-### Feature B: Custom Snooze Buttons
-Allow users to create, save, and delete custom snooze durations on the phone (beyond the hardcoded 15/30/60 min).
+### Feature 2: Duration Slider Max → 4000ms
+Increase the duration slider maximum from 2000ms to 4000ms.
 
-### Feature C: Snooze Status Display
-Show on the phone how long the watch has been snoozing (countdown timer).
+### Feature 3: Named Presets (Save / Load / Delete)
+Allow users to save all current settings as a named preset, load a preset by name, and delete presets.
 
-### Feature D: Vibration Customization
-Allow customizing vibration duration, pattern type, and repeat count. The existing vibration test button (Feature A) should use these settings.
+### Feature 4: Snooze Improvements (Delete + Cancel Active)
+Allow deleting custom snooze durations (already exists) and easily cancelling an active snooze.
+
+### Feature 5: Day/Night Mode
+A toggle at the top of the screen for Day vs Night mode. Each mode stores its own independent settings. Named presets can be loaded into either mode.
 
 ---
 
 ## Architecture
 
-### Data Flow for New Features
+### Data Model for Presets
+
+A preset captures all vibration/scheduling settings (but NOT snooze state or target node, which are transient/device-specific):
+
+```kotlin
+data class Preset(
+    val name: String,
+    val isEnabled: Boolean,
+    val freqMinMinutes: Int,
+    val freqMaxMinutes: Int,
+    val vibrationIntensity: Int,
+    val vibrationDurationMs: Long,
+    val vibrationPatternType: String,
+    val vibrationRepeatCount: Int,
+)
+```
+
+**Storage:** Presets are stored as a JSON array string in DataStore Preferences under a single key `"presets_json"`. This avoids needing Room/SQLite for a simple list of named snapshots. We use `kotlinx.serialization` (already available via Kotlin) to serialize/deserialize.
+
+### Data Model for Day/Night Mode
+
+Day/Night mode is implemented as two independent `VibeSettings` snapshots stored under prefixed keys:
+
+```
+day_is_enabled, day_freq_min_minutes, day_vibration_intensity, ...
+night_is_enabled, night_freq_min_minutes, night_vibration_intensity, ...
+```
+
+A single `active_mode` key (`"day"` or `"night"`) determines which set of settings is currently active and synced to the watch. When the user toggles the mode, the app:
+1. Saves the current settings under the outgoing mode prefix.
+2. Loads the incoming mode settings.
+3. Pushes the incoming mode settings to the watch.
+
+The watch does NOT know about Day/Night mode — it just receives whatever settings are active.
+
+### Sync Status
+
+[`WearSyncManager.pushSettings()`](app/src/main/java/com/example/vild/data/WearSyncManager.kt:51) currently catches exceptions silently. We will make it return a result and expose a `SyncStatus` state in the ViewModel:
+
+```kotlin
+data class SyncStatus(
+    val lastSyncTimestamp: Long = 0L,
+    val lastSyncSuccess: Boolean = true,
+)
+```
+
+### Data Flow Diagram
 
 ```mermaid
 graph TD
-    subgraph Phone App
-        UI[MainActivity - Compose UI]
+    subgraph Phone UI
+        DayNight[Day/Night Toggle]
+        PresetUI[Preset Save/Load/Delete]
+        SyncInd[Sync Status Indicator]
+        SnoozeUI[Snooze Section + Cancel Button]
+        VibUI[Vibration Section - max 4000ms]
+    end
+
+    subgraph Phone Data
         VM[MainViewModel]
         Repo[AppSettingsRepository]
+        PresetStore[Preset Storage - DataStore JSON]
         Sync[WearSyncManager]
     end
 
-    subgraph Shared Module
-        Const[VibeConstants - new keys]
-    end
-
-    subgraph Watch App
+    subgraph Watch
         Listener[VibeDataListenerService]
-        MsgListener[VibeMessageListenerService - NEW]
         WRepo[VibeSettingsRepository]
         Sched[VibeScheduler]
-        Recv[VibeReceiver]
-        Vib[VibrationHelper - NEW]
     end
 
-    UI -->|vibrate now btn| VM
-    VM -->|sendMessage| Sync
-    Sync -->|MessageClient.sendMessage| MsgListener
-    MsgListener -->|immediate vibrate| Vib
+    DayNight -->|toggle mode| VM
+    PresetUI -->|save/load/delete| VM
+    SnoozeUI -->|cancel snooze| VM
+    VibUI -->|settings change| VM
 
-    UI -->|settings change| VM
     VM --> Repo
+    VM --> PresetStore
     VM --> Sync
     Sync -->|DataClient.putDataItem| Listener
+    Sync -->|returns success/fail| SyncInd
+
     Listener --> WRepo
     Listener --> Sched
-    Sched -->|AlarmManager| Recv
-    Recv --> Vib
-    Recv --> Sched
-    Vib -->|uses pattern + intensity from| WRepo
 ```
-
-### Key Design Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| Use `MessageClient` for immediate vibrate | `DataClient` is for persistent state; `MessageClient` is fire-and-forget, perfect for one-shot commands |
-| New `VibrationHelper` on watch | Extract vibration logic from `VibeReceiver` into a shared helper so both scheduled and immediate vibrations use the same pattern/intensity settings |
-| Store custom snooze durations in DataStore on phone only | Custom snooze durations are a phone-UI concern; the watch only needs the resulting `snooze_until_timestamp` |
-| Add vibration pattern settings to the Data Layer | Pattern, duration, and repeat count need to reach the watch alongside existing settings |
-| Snooze countdown is phone-side only | The phone already stores `snooze_until_timestamp`; a periodic UI refresh shows the remaining time |
 
 ---
 
 ## Detailed Implementation Steps
 
-### Step 1: Add New Constants to Shared Module
+### Phase 1: Simple Changes (Duration Slider + Snooze Cancel)
 
-**File:** [`shared/src/main/java/com/example/vild/shared/VibeConstants.kt`](shared/src/main/java/com/example/vild/shared/VibeConstants.kt)
+#### Step 1.1: Increase Duration Slider Max to 4000ms
 
-Add:
-- `PATH_VIBRATE_NOW = "/vibrate_now"` — MessageClient path for immediate vibrate command
-- `KEY_VIBRATION_DURATION_MS = "vibration_duration_ms"` — Long, single-pulse duration in ms (default 500)
-- `KEY_VIBRATION_PATTERN_TYPE = "vibration_pattern_type"` — String enum: `"single"`, `"double"`, `"triple"`, `"ramp"` (default `"single"`)
-- `KEY_VIBRATION_REPEAT_COUNT = "vibration_repeat_count"` — Int, how many times to repeat the pattern (default 1)
+**File:** [`app/src/main/java/com/example/vild/ui/VibrationSection.kt`](app/src/main/java/com/example/vild/ui/VibrationSection.kt:56)
 
-### Step 2: Update VibeSettings Data Class
+- Change `valueRange = 100f..2000f` → `valueRange = 100f..4000f`
+- Update `steps` calculation: `(4000-100)/50 - 1 = 77`
+- Update the label to show seconds when ≥ 1000ms (e.g., "1.5 sec" instead of "1500 ms")
 
-**File:** [`app/src/main/java/com/example/vild/data/AppSettingsRepository.kt`](app/src/main/java/com/example/vild/data/AppSettingsRepository.kt)
+#### Step 1.2: Add Cancel Snooze Button
 
-Add to `VibeSettings`:
-- `vibrationDurationMs: Long = 500L`
-- `vibrationPatternType: String = "single"`
-- `vibrationRepeatCount: Int = 1`
-- `customSnoozeDurations: List<Long> = emptyList()` — stored as comma-separated string in DataStore
+**File:** [`app/src/main/java/com/example/vild/ui/SnoozeSection.kt`](app/src/main/java/com/example/vild/ui/SnoozeSection.kt:31)
 
-Update `AppSettingsRepository`:
-- Add DataStore keys for the new fields
-- Update `settingsFlow` mapping
-- Update `save()` method
+- When `countdownText != null` (snooze is active), show a "Cancel Snooze" button next to the countdown text.
+- Clicking it calls `vm.cancelSnooze()`.
 
-### Step 3: Update WearSyncManager
+**File:** [`app/src/main/java/com/example/vild/MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt:138)
 
-**File:** [`app/src/main/java/com/example/vild/data/WearSyncManager.kt`](app/src/main/java/com/example/vild/data/WearSyncManager.kt)
+- Add `fun cancelSnooze()` that sets `snoozeUntilTimestamp = 0L` and syncs.
 
-- Add new vibration fields to `pushSettings()` DataMap
-- Add `sendVibrateNow(nodeId: String)` method using `MessageClient.sendMessage()`
+### Phase 2: Sync Status Indicator
 
-### Step 4: Update Watch-Side VibeSettingsRepository
+#### Step 2.1: Add SyncStatus to ViewModel
 
-**File:** [`wear/src/main/java/com/example/vild/wear/VibeSettingsRepository.kt`](wear/src/main/java/com/example/vild/wear/VibeSettingsRepository.kt)
+**File:** [`app/src/main/java/com/example/vild/MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt:33)
 
-Add getters for:
-- `vibrationDurationMs(context)`
-- `vibrationPatternType(context)`
-- `vibrationRepeatCount(context)`
+- Add `data class SyncStatus(val lastSyncTimestamp: Long, val lastSyncSuccess: Boolean)`
+- Add `private val _syncStatus = MutableStateFlow(SyncStatus(0L, true))`
+- Expose `val syncStatus: StateFlow<SyncStatus>`
 
-Update `save()` to include the new fields.
+#### Step 2.2: Return Sync Result from WearSyncManager
 
-### Step 5: Create VibrationHelper on Watch
+**File:** [`app/src/main/java/com/example/vild/data/WearSyncManager.kt`](app/src/main/java/com/example/vild/data/WearSyncManager.kt:51)
 
-**New file:** `wear/src/main/java/com/example/vild/wear/VibrationHelper.kt`
+- Change `pushSettings()` return type from `Unit` to `Boolean` (true = success).
+- Return `true` after successful `putDataItem`, `false` in the catch block.
 
-Extract and enhance vibration logic from `VibeReceiver`:
-- `fun vibrate(context: Context)` — reads pattern type, duration, intensity, and repeat count from `VibeSettingsRepository` and builds the appropriate `VibrationEffect`
-- Pattern implementations:
-  - `"single"` → `createOneShot(durationMs, intensity)`
-  - `"double"` → `createWaveform(timings, amplitudes, -1)` with two pulses
-  - `"triple"` → three pulses
-  - `"ramp"` → waveform that ramps up intensity
+#### Step 2.3: Update updateAndSync to Track Status
 
-### Step 6: Update VibeReceiver to Use VibrationHelper
+**File:** [`app/src/main/java/com/example/vild/MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt:166)
 
-**File:** [`wear/src/main/java/com/example/vild/wear/VibeReceiver.kt`](wear/src/main/java/com/example/vild/wear/VibeReceiver.kt)
+- After `syncManager.pushSettings()`, update `_syncStatus` with timestamp and result.
 
-Replace the inline `vibrate()` method with a call to `VibrationHelper.vibrate(context)`.
+#### Step 2.4: Show Sync Status in UI
 
-### Step 7: Update VibeDataListenerService
+**File:** [`app/src/main/java/com/example/vild/MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt:64)
 
-**File:** [`wear/src/main/java/com/example/vild/wear/VibeDataListenerService.kt`](wear/src/main/java/com/example/vild/wear/VibeDataListenerService.kt)
+- Below the TopAppBar or near the Node Selector, show a small text/icon:
+  - Green checkmark + "Synced X sec ago" when successful
+  - Red warning + "Sync failed" when last push failed
 
-Update `onDataChanged()` to extract and save the new vibration pattern fields.
+### Phase 3: Named Presets
 
-### Step 8: Create VibeMessageListenerService on Watch
+#### Step 3.1: Add Preset Data Class
 
-**New file:** `wear/src/main/java/com/example/vild/wear/VibeMessageListenerService.kt`
+**New file:** `app/src/main/java/com/example/vild/data/Preset.kt`
 
-- Extends `WearableListenerService`
-- Overrides `onMessageReceived(messageEvent)`
-- If path == `VibeConstants.PATH_VIBRATE_NOW`, calls `VibrationHelper.vibrate(context)`
-- Register in [`wear/src/main/AndroidManifest.xml`](wear/src/main/AndroidManifest.xml) with `MESSAGE_RECEIVED` intent filter
-
-**Alternative approach:** Merge message handling into the existing `VibeDataListenerService` by also overriding `onMessageReceived()` there. This avoids a new service class. **Recommended: merge into existing service.**
-
-### Step 9: Update MainViewModel
-
-**File:** [`app/src/main/java/com/example/vild/MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt)
-
-Add:
-- `updateVibrationDurationMs(ms: Long)`
-- `updateVibrationPatternType(type: String)`
-- `updateVibrationRepeatCount(count: Int)`
-- `vibrateNow()` — calls `syncManager.sendVibrateNow(targetNodeId)`
-- `addCustomSnoozeDuration(durationMs: Long)`
-- `removeCustomSnoozeDuration(durationMs: Long)`
-- `snoozeCountdownText: StateFlow<String?>` — derived from `snoozeUntilTimestamp`, updated periodically
-
-### Step 10: Update Phone UI (MainActivity.kt)
-
-**File:** [`app/src/main/java/com/example/vild/MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt)
-
-This file is currently 250 lines. With the new features it will grow significantly. **Extract UI sections into separate composable files** to stay under 500 lines:
-
-#### New file: `app/src/main/java/com/example/vild/ui/VibrationSection.kt`
-- Vibration intensity slider (moved from MainActivity)
-- Vibration duration slider (new): 100ms–2000ms
-- Pattern type selector (new): dropdown with single/double/triple/ramp
-- Repeat count selector (new): 1–5
-- **Vibrate Now** button (new)
-
-#### New file: `app/src/main/java/com/example/vild/ui/SnoozeSection.kt`
-- Snooze status countdown (new): shows "Snoozed — X min Y sec remaining" with live countdown
-- Default snooze buttons (15/30/60 min — moved from MainActivity)
-- Custom snooze buttons (new): user-created durations
-- Add custom snooze button (new): opens a simple dialog to enter minutes
-- Delete custom snooze (new): long-press or X button on custom entries
-
-#### Refactored `MainActivity.kt`
-- Keep `VildApp()` composable as the scaffold
-- Import and call `VibrationSection()` and `SnoozeSection()`
-- Keep master toggle, node selector, and frequency sliders inline (they're small)
-
-### Step 11: Update Wear AndroidManifest
-
-**File:** [`wear/src/main/AndroidManifest.xml`](wear/src/main/AndroidManifest.xml)
-
-If using the merged approach (recommended), add `MESSAGE_RECEIVED` intent filter to the existing `VibeDataListenerService`:
-```xml
-<intent-filter>
-    <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
-    <data android:host="*" android:pathPrefix="/vibrate_now" android:scheme="wear" />
-</intent-filter>
+```kotlin
+@Serializable
+data class Preset(
+    val name: String,
+    val isEnabled: Boolean = false,
+    val freqMinMinutes: Int = 30,
+    val freqMaxMinutes: Int = 60,
+    val vibrationIntensity: Int = 128,
+    val vibrationDurationMs: Long = 500L,
+    val vibrationPatternType: String = "single",
+    val vibrationRepeatCount: Int = 1,
+)
 ```
 
-### Step 12: Update Memory Bank and README
+#### Step 3.2: Add Preset Storage to AppSettingsRepository
 
-Update all memory bank files and README.md to reflect the new features.
+**File:** [`app/src/main/java/com/example/vild/data/AppSettingsRepository.kt`](app/src/main/java/com/example/vild/data/AppSettingsRepository.kt:22)
+
+- Add `private val keyPresets = stringPreferencesKey("presets_json")`
+- Add `val presetsFlow: Flow<List<Preset>>` — deserializes JSON from DataStore
+- Add `suspend fun savePreset(preset: Preset)` — adds/replaces by name
+- Add `suspend fun deletePreset(name: String)` — removes by name
+
+#### Step 3.3: Add Preset Methods to MainViewModel
+
+**File:** [`app/src/main/java/com/example/vild/MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt:33)
+
+- Add `val presets: StateFlow<List<Preset>>` — collected from repo
+- Add `fun saveCurrentAsPreset(name: String)` — snapshots current settings into a Preset and saves
+- Add `fun loadPreset(preset: Preset)` — applies preset values to current settings and syncs
+- Add `fun deletePreset(name: String)` — removes from storage
+
+#### Step 3.4: Create Preset UI Section
+
+**New file:** `app/src/main/java/com/example/vild/ui/PresetSection.kt`
+
+- "Save Preset" button → opens dialog asking for a name
+- List of saved presets, each with:
+  - Name label
+  - "Load" button → applies settings
+  - "Delete" button (with confirmation) → removes preset
+- If no presets exist, show "No saved presets" placeholder text
+
+#### Step 3.5: Add PresetSection to MainActivity
+
+**File:** [`app/src/main/java/com/example/vild/MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt:64)
+
+- Add a "Presets" section between the Vibration and Snooze sections (or at the bottom).
+
+### Phase 4: Day/Night Mode
+
+#### Step 4.1: Add Day/Night Mode Storage
+
+**File:** [`app/src/main/java/com/example/vild/data/AppSettingsRepository.kt`](app/src/main/java/com/example/vild/data/AppSettingsRepository.kt:22)
+
+- Add `private val keyActiveMode = stringPreferencesKey("active_mode")` — `"day"` or `"night"`
+- Add `private val keyDaySettings = stringPreferencesKey("day_settings_json")`
+- Add `private val keyNightSettings = stringPreferencesKey("night_settings_json")`
+- Add `val activeModeFlow: Flow<String>` — emits `"day"` or `"night"`
+- Add `suspend fun saveModeSettings(mode: String, settings: VibeSettings)`
+- Add `suspend fun loadModeSettings(mode: String): VibeSettings`
+- Add `suspend fun setActiveMode(mode: String)`
+
+**Design note:** Day/Night settings are serialized as JSON strings in DataStore. This keeps the storage flat and avoids duplicating every preference key with a prefix.
+
+#### Step 4.2: Add Day/Night Mode to MainViewModel
+
+**File:** [`app/src/main/java/com/example/vild/MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt:33)
+
+- Add `val activeMode: StateFlow<String>` — `"day"` or `"night"`
+- Add `fun toggleMode()`:
+  1. Save current settings under the current mode.
+  2. Switch `activeMode` to the other mode.
+  3. Load the other mode's settings.
+  4. Update `_settings` and sync to watch.
+- Modify `loadPreset()` to also save the loaded preset into the current mode's storage.
+
+#### Step 4.3: Add Day/Night Toggle to UI
+
+**File:** [`app/src/main/java/com/example/vild/MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt:64)
+
+- At the very top of the Column (before "Reminders"), add a segmented button or toggle:
+  - ☀️ Day / 🌙 Night
+  - Clicking toggles the mode and reloads settings.
+- Visual indicator of which mode is active (e.g., different background tint or icon).
+
+#### Step 4.4: Allow Loading Presets into Day/Night Modes
+
+The existing `loadPreset()` function already applies settings to the current mode. Since the Day/Night toggle determines which mode is active, loading a preset while in "Night" mode automatically configures the Night settings. No additional logic needed — the UX is:
+1. Toggle to Night mode.
+2. Load a preset → Night mode now uses those settings.
+3. Toggle to Day mode.
+4. Load a different preset → Day mode now uses those settings.
+
+### Phase 5: Add kotlinx.serialization Dependency
+
+#### Step 5.0: Update Build Configuration
+
+**File:** [`gradle/libs.versions.toml`](gradle/libs.versions.toml)
+- Add `kotlinx-serialization-json` version entry
+
+**File:** [`app/build.gradle.kts`](app/build.gradle.kts)
+- Add `kotlin("plugin.serialization")` plugin
+- Add `kotlinx-serialization-json` dependency
+
+This is needed for Preset and Day/Night settings JSON serialization.
+
+---
+
+## Implementation Order (Recommended)
+
+1. **Phase 5** — Add serialization dependency (prerequisite for Phases 3 & 4)
+2. **Phase 1** — Duration slider + snooze cancel (quick wins, no new data structures)
+3. **Phase 2** — Sync status indicator (small scope, improves UX immediately)
+4. **Phase 3** — Named presets (new data layer, new UI section)
+5. **Phase 4** — Day/Night mode (builds on presets infrastructure)
 
 ---
 
 ## Files Summary
 
-| Action | File | Description |
-|--------|------|-------------|
-| Modify | `shared/.../VibeConstants.kt` | Add new keys for vibration pattern, duration, repeat, and message path |
-| Modify | `app/.../data/AppSettingsRepository.kt` | Add new fields to `VibeSettings` and DataStore keys |
-| Modify | `app/.../data/WearSyncManager.kt` | Push new fields + add `sendVibrateNow()` via MessageClient |
-| Modify | `app/.../MainViewModel.kt` | Add update methods for new settings, vibrateNow, custom snooze, countdown |
-| Modify | `app/.../MainActivity.kt` | Refactor to use extracted section composables |
-| Create | `app/.../ui/VibrationSection.kt` | Vibration settings UI + Vibrate Now button |
-| Create | `app/.../ui/SnoozeSection.kt` | Snooze buttons + countdown + custom snooze management |
-| Create | `wear/.../VibrationHelper.kt` | Shared vibration logic with pattern support |
-| Modify | `wear/.../VibeReceiver.kt` | Delegate to VibrationHelper |
-| Modify | `wear/.../VibeDataListenerService.kt` | Handle new fields + add `onMessageReceived()` for vibrate-now |
-| Modify | `wear/.../VibeSettingsRepository.kt` | Add new field getters/setters |
-| Modify | `wear/src/main/AndroidManifest.xml` | Add MESSAGE_RECEIVED intent filter |
-| Modify | `memory-bank/*.md` | Update all memory bank files |
-| Modify | `README.md` | Document new features |
+| Action | File | Phase | Description |
+|--------|------|-------|-------------|
+| Modify | [`gradle/libs.versions.toml`](gradle/libs.versions.toml) | 5 | Add kotlinx-serialization-json |
+| Modify | [`app/build.gradle.kts`](app/build.gradle.kts) | 5 | Add serialization plugin + dependency |
+| Modify | [`app/.../ui/VibrationSection.kt`](app/src/main/java/com/example/vild/ui/VibrationSection.kt) | 1 | Duration slider max → 4000ms |
+| Modify | [`app/.../ui/SnoozeSection.kt`](app/src/main/java/com/example/vild/ui/SnoozeSection.kt) | 1 | Add Cancel Snooze button |
+| Modify | [`app/.../MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt) | 1-4 | cancelSnooze, syncStatus, presets, day/night mode |
+| Modify | [`app/.../data/WearSyncManager.kt`](app/src/main/java/com/example/vild/data/WearSyncManager.kt) | 2 | Return Boolean from pushSettings |
+| Modify | [`app/.../data/AppSettingsRepository.kt`](app/src/main/java/com/example/vild/data/AppSettingsRepository.kt) | 3-4 | Preset storage, day/night mode storage |
+| Create | `app/.../data/Preset.kt` | 3 | Preset data class with serialization |
+| Create | `app/.../ui/PresetSection.kt` | 3 | Preset save/load/delete UI |
+| Modify | [`app/.../MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt) | 3-4 | Add PresetSection, Day/Night toggle, sync indicator |
+| Modify | `memory-bank/*.md` | — | Update documentation |
+| Modify | [`README.md`](README.md) | — | Document new features |
+
+## What Does NOT Change
+
+- **`:shared` module** — No new constants needed. Day/Night mode and presets are phone-only concepts. The watch just receives whatever settings are active.
+- **`:wear` module** — No changes. The watch is unaware of presets or day/night mode. It receives the same `VibeSettings` data it always has.
+- **Sync mechanism** — Still unidirectional phone → watch via DataClient. No new Data Layer paths needed.

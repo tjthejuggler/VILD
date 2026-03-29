@@ -32,13 +32,22 @@ fun SnoozeSection(settings: VibeSettings, vm: MainViewModel) {
     val countdownText by vm.snoozeCountdownText.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
-    // ── Countdown display ────────────────────────────────────────────────────
+    // ── Countdown display + cancel button ────────────────────────────────────
     if (countdownText != null) {
-        Text(
-            text = countdownText!!,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = countdownText!!,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            TextButton(onClick = { vm.cancelSnooze() }) {
+                Text("Cancel snooze")
+            }
+        }
     }
 
     // ── Default snooze buttons ───────────────────────────────────────────────

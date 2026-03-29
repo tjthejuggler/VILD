@@ -11,7 +11,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.vild.shared.VibeConstants
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "app_vibe_settings")
 
@@ -33,6 +37,13 @@ class AppSettingsRepository(private val context: Context) {
     private val keyVibrationPatternType = stringPreferencesKey(VibeConstants.KEY_VIBRATION_PATTERN_TYPE)
     private val keyVibrationRepeatCount = intPreferencesKey(VibeConstants.KEY_VIBRATION_REPEAT_COUNT)
     private val keyCustomSnoozeDurations = stringPreferencesKey("custom_snooze_durations")
+    private val keyPresets = stringPreferencesKey("presets_json")
+
+    // ── Day/Night mode keys ──────────────────────────────────────────────────
+
+    private val keyActiveMode = stringPreferencesKey("active_mode")
+    private val keyDaySettings = stringPreferencesKey("day_settings_json")
+    private val keyNightSettings = stringPreferencesKey("night_settings_json")
 
     // ── Read ─────────────────────────────────────────────────────────────────
 
@@ -55,6 +66,16 @@ class AppSettingsRepository(private val context: Context) {
         )
     }
 
+    val presetsFlow: Flow<List<Preset>> = context.dataStore.data.map { prefs ->
+        val json = prefs[keyPresets] ?: return@map emptyList()
+        runCatching { Json.decodeFromString<List<Preset>>(json) }.getOrDefault(emptyList())
+    }
+
+    /** Emits `"day"` or `"night"` — defaults to `"day"` if never set. */
+    val activeModeFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[keyActiveMode] ?: "day"
+    }
+
     // ── Write ────────────────────────────────────────────────────────────────
 
     suspend fun save(settings: VibeSettings) {
@@ -71,11 +92,61 @@ class AppSettingsRepository(private val context: Context) {
             prefs[keyCustomSnoozeDurations] = settings.customSnoozeDurations.joinToString(",")
         }
     }
+
+    /** Adds or replaces a preset by name. */
+    suspend fun savePreset(preset: Preset) {
+        context.dataStore.edit { prefs ->
+            val current = runCatching {
+                Json.decodeFromString<List<Preset>>(prefs[keyPresets] ?: "[]")
+            }.getOrDefault(emptyList())
+            val updated = current.filter { it.name != preset.name } + preset
+            prefs[keyPresets] = Json.encodeToString(updated)
+        }
+    }
+
+    /** Removes a preset by name. No-op if the name does not exist. */
+    suspend fun deletePreset(name: String) {
+        context.dataStore.edit { prefs ->
+            val current = runCatching {
+                Json.decodeFromString<List<Preset>>(prefs[keyPresets] ?: "[]")
+            }.getOrDefault(emptyList())
+            prefs[keyPresets] = Json.encodeToString(current.filter { it.name != name })
+        }
+    }
+
+    // ── Day/Night mode ───────────────────────────────────────────────────────
+
+    /** Persists [settings] under the given [mode] key (`"day"` or `"night"`). */
+    suspend fun saveModeSettings(mode: String, settings: VibeSettings) {
+        val key = if (mode == "night") keyNightSettings else keyDaySettings
+        val json = Json.encodeToString(settings)
+        context.dataStore.edit { prefs -> prefs[key] = json }
+    }
+
+    /**
+     * Loads the [VibeSettings] stored for [mode] (`"day"` or `"night"`).
+     * Falls back to the current active settings if no mode snapshot exists yet.
+     */
+    suspend fun loadModeSettings(mode: String): VibeSettings {
+        val key = if (mode == "night") keyNightSettings else keyDaySettings
+        val prefs = context.dataStore.data.first()
+        val json = prefs[key] ?: return settingsFlow.first()
+        return runCatching { Json.decodeFromString<VibeSettings>(json) }
+            .getOrElse { settingsFlow.first() }
+    }
+
+    /** Persists the active mode (`"day"` or `"night"`) to DataStore. */
+    suspend fun setActiveMode(mode: String) {
+        context.dataStore.edit { prefs -> prefs[keyActiveMode] = mode }
+    }
 }
 
 /**
  * Immutable snapshot of all vibe settings stored on the phone.
+ *
+ * Annotated with [@Serializable] so it can be stored as JSON for Day/Night mode snapshots.
  */
+@Serializable
 data class VibeSettings(
     val isEnabled: Boolean = false,
     val freqMinMinutes: Int = 30,

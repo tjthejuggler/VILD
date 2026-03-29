@@ -1,59 +1,60 @@
 # VILD – Active Context
 
-> Last updated: 2026-03-29T15:15 UTC-6
+> Last updated: 2026-03-29T15:49 UTC-6
 
 ## Current State
 
-The core architecture and logic for all three modules (`:app`, `:wear`, `:shared`) have been implemented. The project is in a **functional baseline** state — all primary features are coded and wired together. A new feature planning phase has begun.
+The core architecture is implemented and functional. A **second wave of features** has been planned covering sync status, presets, day/night mode, snooze improvements, and a duration slider increase. See [`plans/new-features-plan.md`](../plans/new-features-plan.md) for the full implementation plan.
 
 ## What Was Recently Completed
 
-- `:shared` module with `VibeConstants` (Data Layer path and all keys).
-- `:wear` module with full vibration pipeline:
-  - `VibeSettingsRepository` — SharedPreferences storage on the watch.
-  - `VibeDataListenerService` — receives Data Layer updates, persists settings, triggers scheduler.
-  - `VibeScheduler` — AlarmManager scheduling with target-node filtering and snooze support.
-  - `VibeReceiver` — BroadcastReceiver that fires vibration and reschedules.
-- `:app` module with full phone companion:
-  - `AppSettingsRepository` — DataStore Preferences for local persistence.
-  - `WearSyncManager` — pushes settings to Data Layer with `setUrgent()`.
-  - `MainViewModel` — AndroidViewModel coordinating repo + sync.
-  - `MainActivity` — Jetpack Compose UI with all controls.
-- Minimal wear-side `MainActivity` added for Android Studio run configuration support (calls `finish()` immediately).
+- All core features from the first wave (vibrate now, vibration customization, custom snooze, snooze countdown).
+- Watch-side Compose UI with "VILD is active" message and Test Vibration button.
+- Build fixes (Gradle plugin, Wear Compose BOM, coroutines dependency).
+- Architecture analysis and planning for the second wave of features.
 
-## What's Next (Planned Features)
+## What's Next (Second Wave — Planned Features)
 
-Four new features are planned — see [`plans/new-features-plan.md`](../plans/new-features-plan.md) for full details:
+Five new features are planned — see [`plans/new-features-plan.md`](../plans/new-features-plan.md) for full details:
 
-1. **Immediate Vibrate Button** — Phone sends a one-shot vibration command to the watch via `MessageClient.sendMessage()`. Uses the currently configured intensity and pattern.
-2. **Vibration Customization** — New settings for vibration duration (ms), pattern type (single/double/triple/ramp), and repeat count. Synced to watch via Data Layer. Extracted into a shared `VibrationHelper` on the watch.
-3. **Custom Snooze Buttons** — Users can create/save/delete custom snooze durations beyond the hardcoded 15/30/60 min. Stored in phone-side DataStore only.
-4. **Snooze Status Display** — Live countdown on the phone showing remaining snooze time.
+### Phase 1: Quick Wins
+1. **Duration Slider Max → 4000ms** — Increase from 2000ms in [`VibrationSection.kt`](../app/src/main/java/com/example/vild/ui/VibrationSection.kt).
+2. **Cancel Active Snooze** — Add a "Cancel Snooze" button in [`SnoozeSection.kt`](../app/src/main/java/com/example/vild/ui/SnoozeSection.kt) + `cancelSnooze()` in [`MainViewModel.kt`](../app/src/main/java/com/example/vild/MainViewModel.kt).
+
+### Phase 2: Sync Status Indicator
+3. **Sync Status** — Make [`WearSyncManager.pushSettings()`](../app/src/main/java/com/example/vild/data/WearSyncManager.kt) return success/failure. Show last sync time + status in the phone UI.
+
+### Phase 3: Named Presets
+4. **Presets** — Save/load/delete named presets. New [`Preset.kt`](../app/src/main/java/com/example/vild/data/Preset.kt) data class, JSON storage in DataStore, new [`PresetSection.kt`](../app/src/main/java/com/example/vild/ui/PresetSection.kt) UI.
+
+### Phase 4: Day/Night Mode
+5. **Day/Night Mode** — Toggle at the top of the screen. Two independent settings sets stored as JSON in DataStore. Presets can be loaded into either mode.
+
+### Phase 5 (Prerequisite): Build Config
+- Add `kotlinx-serialization-json` dependency for Preset and Day/Night JSON serialization.
 
 ### Implementation Order
-1. Add new constants to `:shared` (`VibeConstants`)
-2. Update `VibeSettings` data class and `AppSettingsRepository`
-3. Update `WearSyncManager` (new DataMap fields + `sendVibrateNow()` via MessageClient)
-4. Update watch-side `VibeSettingsRepository` (new field getters)
-5. Create `VibrationHelper` on watch (extracted vibration logic with pattern support)
-6. Update `VibeReceiver` to delegate to `VibrationHelper`
-7. Update `VibeDataListenerService` (new fields + `onMessageReceived()` for vibrate-now)
-8. Update `MainViewModel` (new update methods, vibrateNow, custom snooze, countdown)
-9. Extract phone UI into `VibrationSection.kt` and `SnoozeSection.kt`
-10. Update `wear/AndroidManifest.xml` (add MESSAGE_RECEIVED intent filter)
-11. Update README and memory bank
+1. Phase 5 (serialization dependency — prerequisite)
+2. Phase 1 (duration slider + snooze cancel — quick wins)
+3. Phase 2 (sync status indicator)
+4. Phase 3 (named presets)
+5. Phase 4 (day/night mode — builds on presets)
 
 ## Active Decisions
 
-- The watch app is **headless** — no Activity UI, only services and receivers. The launcher Activity calls `finish()` immediately.
-- Settings sync is **unidirectional** (phone → watch only).
+- The watch app has a minimal Compose UI but is still primarily headless — all configuration is done from the phone.
+- Settings sync is **unidirectional** (phone → watch only) via Data Layer auto-sync.
 - `AlarmManager.setExactAndAllowWhileIdle()` is used for Doze-mode reliability.
-- `goAsync()` + coroutine pattern is used in `VibeReceiver` to allow suspend calls within the broadcast receiver lifecycle.
-- **Immediate vibrate uses `MessageClient`** (fire-and-forget) rather than `DataClient` (persistent state).
-- **Vibration logic will be extracted** into a `VibrationHelper` shared by both `VibeReceiver` and the message handler.
+- `goAsync()` + coroutine pattern is used in `VibeReceiver`.
+- **Immediate vibrate uses `MessageClient`** (fire-and-forget).
 - **Custom snooze durations are phone-only** — the watch only receives the resulting `snooze_until_timestamp`.
-- **`onMessageReceived()` will be merged** into the existing `VibeDataListenerService` rather than creating a separate service.
+- **Presets are phone-only** — the watch receives whatever settings are currently active, unaware of presets.
+- **Day/Night mode is phone-only** — the watch receives whatever mode's settings are currently active.
+- **Presets stored as JSON array** in a single DataStore key (avoids Room/SQLite complexity).
+- **Day/Night settings stored as JSON** in two DataStore keys (`day_settings_json`, `night_settings_json`).
+- **No changes to `:shared` or `:wear` modules** needed for the second wave — all new features are phone-side only.
+- **Intensity max stays at 255** — this is an Android hardware limit for `VibrationEffect` amplitude.
 
 ## Known Issues
 
-- None currently tracked. The project has just reached its initial implementation milestone.
+- None currently tracked.
