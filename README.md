@@ -1,6 +1,6 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-03-29T22:55 UTC
+> Last updated: 2026-03-29T23:23 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
 
@@ -46,12 +46,14 @@ Wear OS application that receives settings from the phone and schedules vibratio
 |------|---------|
 | `VibeSettingsRepository.kt` | SharedPreferences storage for settings on the watch |
 | `VibeDataListenerService.kt` | `WearableListenerService` – receives Data Layer updates, saves settings, triggers scheduler |
-| `VibeScheduler.kt` | Schedules/cancels `AlarmManager` alarms; checks `target_node_id` before scheduling |
+| `VibeScheduler.kt` | Schedules/cancels `AlarmManager` alarms via `setAlarmClock()` (Doze-exempt); checks `target_node_id` before scheduling |
 | `VibeReceiver.kt` | `BroadcastReceiver` – fires vibration and reschedules next alarm |
 | `BootReceiver.kt` | `BroadcastReceiver` – listens for `BOOT_COMPLETED` and reschedules the alarm after reboot |
 | `MainActivity.kt` | Wear OS Compose UI; calls `VibeScheduler.schedule()` on every launch to recover from process death |
 
 **Active-watch logic:** `VibeScheduler.schedule()` fetches the local Wear OS node ID via `Wearable.getNodeClient` and compares it to `KEY_TARGET_NODE_ID`. If they don't match (and the target is not `"all"`), the alarm is cancelled rather than scheduled.
+
+**Alarm strategy:** Uses `AlarmManager.setAlarmClock()` instead of `setExactAndAllowWhileIdle()`. The latter has a system-enforced minimum interval of ~10 minutes on API 31+, making it unsuitable for short reminder intervals. `setAlarmClock()` is exempt from all Doze rate-limiting and always fires at the exact requested time. The trade-off is a small alarm icon in the watch status bar.
 
 ---
 
@@ -132,6 +134,20 @@ VibeScheduler           VibeScheduler
 ---
 
 ## Changelog
+
+### 2026-03-29T23:23 UTC
+- **Bug fix – scheduled vibrations never repeating (Doze rate-limiting):**
+  - **Root cause:** `setExactAndAllowWhileIdle()` has a system-enforced minimum interval of ~10 minutes on API 31+ (targetSdk 36). When the user set 1–2 minute intervals, the first alarm fired but subsequent ones were silently deferred or dropped by the OS. Combined with the BroadcastReceiver context issues from the previous fix, the alarm chain was permanently broken.
+  - **Fix – Switched to `setAlarmClock()`** ([`VibeScheduler.kt`](wear/src/main/java/com/example/vild/wear/VibeScheduler.kt:80)): `AlarmManager.setAlarmClock()` is exempt from all Doze mode rate-limiting and always fires at the exact requested time. This allows reminder intervals as short as 1 minute. The trade-off is a small alarm icon in the watch status bar, which is appropriate for a reminder app.
+  - Retained all previous fixes: `applicationContext` usage, 10s WakeLock, 5s Play Services timeout, emergency reschedule on failure.
+
+### 2026-03-29T23:08 UTC
+- **Bug fix – alarm chain context issues:**
+  - **Root cause:** `VibeReceiver` passed its short-lived BroadcastReceiver context to Play Services calls, and the 3-second WakeLock was too short.
+  - **Fix 1 – Use `applicationContext` everywhere** ([`VibeReceiver.kt`](wear/src/main/java/com/example/vild/wear/VibeReceiver.kt), [`VibeScheduler.kt`](wear/src/main/java/com/example/vild/wear/VibeScheduler.kt), [`VibeDataListenerService.kt`](wear/src/main/java/com/example/vild/wear/VibeDataListenerService.kt), [`BootReceiver.kt`](wear/src/main/java/com/example/vild/wear/BootReceiver.kt)): All callers now pass `context.applicationContext`.
+  - **Fix 2 – Extended WakeLock to 10 seconds** ([`VibeReceiver.kt`](wear/src/main/java/com/example/vild/wear/VibeReceiver.kt:36)).
+  - **Fix 3 – 5-second timeout on `getNodeClient().localNode`** ([`VibeScheduler.kt`](wear/src/main/java/com/example/vild/wear/VibeScheduler.kt:113)).
+  - **Fix 4 – Emergency reschedule on failure** ([`VibeReceiver.kt`](wear/src/main/java/com/example/vild/wear/VibeReceiver.kt:44)).
 
 ### 2026-03-29T22:55 UTC
 - **Bug fix – random timer never firing:**

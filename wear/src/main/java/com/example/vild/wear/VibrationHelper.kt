@@ -5,6 +5,9 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.util.Log
+
+private const val TAG = "VibrationHelper"
 
 /**
  * Centralised vibration logic for the watch.
@@ -25,8 +28,14 @@ object VibrationHelper {
         val patternType = VibeSettingsRepository.vibrationPatternType(context)
         val repeatCount = VibeSettingsRepository.vibrationRepeatCount(context)
 
+        Log.d(TAG, "vibrate: intensity=$intensity, durationMs=$durationMs, patternType=$patternType, repeatCount=$repeatCount")
+
+        val vibrator = getVibrator(context)
+        Log.d(TAG, "vibrate: hasVibrator=${vibrator.hasVibrator()}")
+
         val effect = buildEffect(patternType, durationMs, intensity, repeatCount)
-        getVibrator(context).vibrate(effect)
+        vibrator.vibrate(effect)
+        Log.d(TAG, "vibrate: vibrator.vibrate() called successfully")
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

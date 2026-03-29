@@ -1,6 +1,6 @@
 # VILD – Progress
 
-> Last updated: 2026-03-29T15:17 UTC-6
+> Last updated: 2026-03-29T17:08 UTC-6
 
 ## Completed
 
@@ -67,3 +67,7 @@ Phone UI → ViewModel → MessageClient → Watch Listener → VibrationHelper 
 ## Known Issues
 
 None currently tracked.
+
+## Bug Fixes Applied
+
+- **2026-03-29T17:08 UTC-6:** Fixed alarm chain breaking after first vibration — `VibeReceiver`, `VibeScheduler`, `VibeDataListenerService`, `BootReceiver` all updated to use `applicationContext`, extended WakeLock, added Play Services timeout, added emergency reschedule.

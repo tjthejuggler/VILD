@@ -1,6 +1,6 @@
 # VILD – Active Context
 
-> Last updated: 2026-03-29T15:49 UTC-6
+> Last updated: 2026-03-29T17:23 UTC-6
 
 ## Current State
 
@@ -44,7 +44,7 @@ Five new features are planned — see [`plans/new-features-plan.md`](../plans/ne
 
 - The watch app has a minimal Compose UI but is still primarily headless — all configuration is done from the phone.
 - Settings sync is **unidirectional** (phone → watch only) via Data Layer auto-sync.
-- `AlarmManager.setExactAndAllowWhileIdle()` is used for Doze-mode reliability.
+- `AlarmManager.setAlarmClock()` is used for Doze-exempt alarm scheduling (no rate-limiting, supports short intervals like 1–2 min).
 - `goAsync()` + coroutine pattern is used in `VibeReceiver`.
 - **Immediate vibrate uses `MessageClient`** (fire-and-forget).
 - **Custom snooze durations are phone-only** — the watch only receives the resulting `snooze_until_timestamp`.
@@ -58,3 +58,11 @@ Five new features are planned — see [`plans/new-features-plan.md`](../plans/ne
 ## Known Issues
 
 - None currently tracked.
+
+## Recent Bug Fixes
+
+### 2026-03-29T17:23 UTC-6 — Scheduled vibrations never repeating
+- **Symptom:** Random vibrations fire once then never again, even with 1–2 min intervals.
+- **Root cause 1 (Doze rate-limiting):** `setExactAndAllowWhileIdle()` has a system-enforced ~10 min minimum interval on API 31+. Short intervals were silently deferred/dropped.
+- **Root cause 2 (Context issues):** `VibeReceiver` passed its short-lived BroadcastReceiver context to Play Services calls; 3s WakeLock was too short.
+- **Fix:** Switched to `setAlarmClock()` (Doze-exempt, no rate-limiting). Also: `applicationContext` everywhere, 10s WakeLock, 5s Play Services timeout, emergency reschedule on failure.

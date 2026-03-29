@@ -25,7 +25,7 @@ class BootReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                VibeScheduler.schedule(context)
+                VibeScheduler.schedule(context.applicationContext)
                 Log.d(TAG, "onReceive: alarm rescheduled after boot")
             } catch (e: Exception) {
                 Log.e(TAG, "onReceive: failed to reschedule alarm after boot", e)

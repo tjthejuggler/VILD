@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -50,6 +52,14 @@
         <receiver
             android:name=".VibeReceiver"
             android:exported="false" />
+
+        <!-- Short-lived foreground service that performs vibrations.
+             Vibrating from a Service context is more reliable on Wear OS
+             than from a BroadcastReceiver context. -->
+        <service
+            android:name=".VibeVibrationService"
+            android:exported="false"
+            android:foregroundServiceType="shortService" />
 
         <!-- Reschedules the vibration alarm after the device reboots -->
         <receiver
