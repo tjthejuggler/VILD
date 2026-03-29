@@ -51,7 +51,13 @@ class VibeDataListenerService : WearableListenerService() {
                 )
 
                 CoroutineScope(Dispatchers.IO).launch {
-                    VibeScheduler.schedule(this@VibeDataListenerService)
+                    try {
+                        Log.d(TAG, "onDataChanged: calling VibeScheduler.schedule()")
+                        VibeScheduler.schedule(this@VibeDataListenerService)
+                        Log.d(TAG, "onDataChanged: VibeScheduler.schedule() completed")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "onDataChanged: VibeScheduler.schedule() FAILED", e)
+                    }
                 }
             }
         }

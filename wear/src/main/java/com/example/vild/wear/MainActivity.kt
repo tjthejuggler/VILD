@@ -1,6 +1,7 @@
 package com.example.vild.wear
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -19,16 +20,37 @@ import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.Text
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+private const val TAG = "WearMainActivity"
 
 /**
  * Launcher activity for the Wear OS module.
  *
  * Displays a persistent status screen so the OS does not kill the app immediately,
  * which is required for [VibeDataListenerService] to reliably receive Data Layer events.
+ *
+ * Calls [VibeScheduler.schedule] on every launch so the alarm is always active,
+ * even if the process was killed or the watch was rebooted.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Re-establish the alarm every time the app is opened.
+        // This is the safety net for cases where the alarm was lost due to
+        // process death, OS cleanup, or device reboot.
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Log.d(TAG, "onCreate: ensuring alarm is scheduled")
+                VibeScheduler.schedule(this@MainActivity)
+            } catch (e: Exception) {
+                Log.e(TAG, "onCreate: VibeScheduler.schedule() FAILED", e)
+            }
+        }
+
         setContent {
             VildWearApp()
         }

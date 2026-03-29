@@ -1,6 +1,6 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-03-29T22:00 UTC
+> Last updated: 2026-03-29T22:55 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
 
@@ -48,6 +48,8 @@ Wear OS application that receives settings from the phone and schedules vibratio
 | `VibeDataListenerService.kt` | `WearableListenerService` – receives Data Layer updates, saves settings, triggers scheduler |
 | `VibeScheduler.kt` | Schedules/cancels `AlarmManager` alarms; checks `target_node_id` before scheduling |
 | `VibeReceiver.kt` | `BroadcastReceiver` – fires vibration and reschedules next alarm |
+| `BootReceiver.kt` | `BroadcastReceiver` – listens for `BOOT_COMPLETED` and reschedules the alarm after reboot |
+| `MainActivity.kt` | Wear OS Compose UI; calls `VibeScheduler.schedule()` on every launch to recover from process death |
 
 **Active-watch logic:** `VibeScheduler.schedule()` fetches the local Wear OS node ID via `Wearable.getNodeClient` and compares it to `KEY_TARGET_NODE_ID`. If they don't match (and the target is not `"all"`), the alarm is cancelled rather than scheduled.
 
@@ -130,6 +132,16 @@ VibeScheduler           VibeScheduler
 ---
 
 ## Changelog
+
+### 2026-03-29T22:55 UTC
+- **Bug fix – random timer never firing:**
+  - **Root cause 1 – No alarm recovery after process death:** `VibeScheduler.schedule()` was only called from `VibeDataListenerService.onDataChanged()` and `VibeReceiver.onReceive()`. If the watch process was killed by the OS (common on Wear OS), the `AlarmManager` alarm was lost permanently until the phone pushed new settings.
+  - **Root cause 2 – No alarm recovery after reboot:** `AlarmManager` alarms are cleared on device reboot. There was no `BOOT_COMPLETED` receiver to re-establish the alarm.
+  - **Root cause 3 – Silent failure in `isThisNodeTargeted()`:** If `Wearable.getNodeClient().localNode.await()` threw an exception (e.g., Play Services temporarily unavailable), the entire `schedule()` call was silently swallowed by the outer try-catch, leaving no alarm scheduled.
+  - **Fix 1 – `MainActivity.onCreate()` now calls `VibeScheduler.schedule()`** ([`wear/src/main/java/com/example/vild/wear/MainActivity.kt`](wear/src/main/java/com/example/vild/wear/MainActivity.kt)): Every time the user opens the watch app, the alarm is re-established. This is the primary safety net for process-death scenarios.
+  - **Fix 2 – New `BootReceiver`** ([`wear/src/main/java/com/example/vild/wear/BootReceiver.kt`](wear/src/main/java/com/example/vild/wear/BootReceiver.kt)): Listens for `ACTION_BOOT_COMPLETED` and calls `VibeScheduler.schedule()` so the alarm survives device reboots.
+  - **Fix 3 – `isThisNodeTargeted()` now defaults to `true` on exception** ([`wear/src/main/java/com/example/vild/wear/VibeScheduler.kt`](wear/src/main/java/com/example/vild/wear/VibeScheduler.kt)): If the node client call fails, scheduling proceeds rather than silently aborting.
+  - **Manifest updates** ([`wear/src/main/AndroidManifest.xml`](wear/src/main/AndroidManifest.xml)): Added `RECEIVE_BOOT_COMPLETED` permission and registered `BootReceiver` with `BOOT_COMPLETED` intent filter.
 
 ### 2026-03-29T22:00 UTC
 - **Phase 4 – Day/Night Mode:**

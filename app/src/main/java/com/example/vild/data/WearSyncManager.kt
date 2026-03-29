@@ -62,6 +62,9 @@ class WearSyncManager(private val context: Context) {
                 dataMap.putLong(VibeConstants.KEY_VIBRATION_DURATION_MS, settings.vibrationDurationMs)
                 dataMap.putString(VibeConstants.KEY_VIBRATION_PATTERN_TYPE, settings.vibrationPatternType)
                 dataMap.putInt(VibeConstants.KEY_VIBRATION_REPEAT_COUNT, settings.vibrationRepeatCount)
+                // Timestamp forces the Data Layer to treat every push as a change,
+                // preventing deduplication when settings values are identical.
+                dataMap.putLong("push_timestamp", System.currentTimeMillis())
             }.asPutDataRequest().setUrgent()
 
             Wearable.getDataClient(context).putDataItem(request).await()

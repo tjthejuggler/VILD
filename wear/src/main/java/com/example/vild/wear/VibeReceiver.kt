@@ -4,9 +4,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.PowerManager
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
+private const val TAG = "VibeReceiver"
 
 /**
  * Handles the [AlarmManager] broadcast: acquires a short WakeLock,
@@ -18,6 +21,7 @@ import kotlinx.coroutines.launch
 class VibeReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d(TAG, "onReceive: alarm fired — action=${intent.action}")
         val pendingResult = goAsync()
 
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -28,8 +32,13 @@ class VibeReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                Log.d(TAG, "onReceive: calling VibrationHelper.vibrate()")
                 VibrationHelper.vibrate(context)
+                Log.d(TAG, "onReceive: vibration done — rescheduling next alarm")
                 VibeScheduler.schedule(context)
+                Log.d(TAG, "onReceive: reschedule complete")
+            } catch (e: Exception) {
+                Log.e(TAG, "onReceive: FAILED during vibrate/reschedule", e)
             } finally {
                 if (wakeLock.isHeld) wakeLock.release()
                 pendingResult.finish()
