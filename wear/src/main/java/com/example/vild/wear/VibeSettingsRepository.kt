@@ -23,6 +23,9 @@ object VibeSettingsRepository {
         vibrationIntensity: Int,
         snoozeUntilTimestamp: Long,
         targetNodeId: String,
+        vibrationDurationMs: Long,
+        vibrationPatternType: String,
+        vibrationRepeatCount: Int,
     ) {
         prefs(context).edit()
             .putBoolean(VibeConstants.KEY_IS_ENABLED, isEnabled)
@@ -31,6 +34,9 @@ object VibeSettingsRepository {
             .putInt(VibeConstants.KEY_VIBRATION_INTENSITY, vibrationIntensity)
             .putLong(VibeConstants.KEY_SNOOZE_UNTIL_TIMESTAMP, snoozeUntilTimestamp)
             .putString(VibeConstants.KEY_TARGET_NODE_ID, targetNodeId)
+            .putLong(VibeConstants.KEY_VIBRATION_DURATION_MS, vibrationDurationMs)
+            .putString(VibeConstants.KEY_VIBRATION_PATTERN_TYPE, vibrationPatternType)
+            .putInt(VibeConstants.KEY_VIBRATION_REPEAT_COUNT, vibrationRepeatCount)
             .apply()
     }
 
@@ -52,4 +58,14 @@ object VibeSettingsRepository {
     fun targetNodeId(context: Context): String =
         prefs(context).getString(VibeConstants.KEY_TARGET_NODE_ID, VibeConstants.VALUE_TARGET_NODE_ALL)
             ?: VibeConstants.VALUE_TARGET_NODE_ALL
+
+    fun vibrationDurationMs(context: Context): Long =
+        prefs(context).getLong(VibeConstants.KEY_VIBRATION_DURATION_MS, 500L)
+
+    fun vibrationPatternType(context: Context): String =
+        prefs(context).getString(VibeConstants.KEY_VIBRATION_PATTERN_TYPE, "single")
+            ?: "single"
+
+    fun vibrationRepeatCount(context: Context): Int =
+        prefs(context).getInt(VibeConstants.KEY_VIBRATION_REPEAT_COUNT, 1)
 }

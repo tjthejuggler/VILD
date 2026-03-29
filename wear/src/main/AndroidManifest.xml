@@ -24,7 +24,8 @@
             </intent-filter>
         </activity>
 
-        <!-- Listens for vibe settings pushed from the mobile app via the Data Layer -->
+        <!-- Listens for vibe settings pushed from the mobile app via the Data Layer,
+             and handles immediate vibrate-now messages via MessageClient -->
         <service
             android:name=".VibeDataListenerService"
             android:exported="true">
@@ -33,6 +34,13 @@
                 <data
                     android:host="*"
                     android:pathPrefix="/vibe_settings"
+                    android:scheme="wear" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/vibrate_now"
                     android:scheme="wear" />
             </intent-filter>
         </service>

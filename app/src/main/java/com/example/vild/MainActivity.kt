@@ -38,10 +38,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.vild.shared.VibeConstants
+import com.example.vild.ui.SnoozeSection
+import com.example.vild.ui.VibrationSection
 import com.example.vild.ui.theme.VILDTheme
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -130,41 +129,15 @@ fun VildApp(vm: MainViewModel = viewModel()) {
 
             HorizontalDivider()
 
-            // ── Intensity ────────────────────────────────────────────────────
-            SectionLabel("Vibration Intensity")
-            Text(
-                "Intensity: ${settings.vibrationIntensity}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Slider(
-                value = settings.vibrationIntensity.toFloat(),
-                onValueChange = { vm.updateIntensity(it.toInt()) },
-                valueRange = 1f..255f,
-                steps = 253,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // ── Vibration settings + Vibrate Now ─────────────────────────────
+            SectionLabel("Vibration")
+            VibrationSection(settings = settings, vm = vm)
 
             HorizontalDivider()
 
             // ── Snooze ───────────────────────────────────────────────────────
             SectionLabel("Snooze")
-            if (settings.snoozeUntilTimestamp > System.currentTimeMillis()) {
-                val formatted = SimpleDateFormat("HH:mm", Locale.getDefault())
-                    .format(Date(settings.snoozeUntilTimestamp))
-                Text(
-                    "Snoozed until $formatted",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SnoozeButton("15 min", 15 * 60_000L, vm)
-                SnoozeButton("30 min", 30 * 60_000L, vm)
-                SnoozeButton("1 hr", 60 * 60_000L, vm)
-            }
+            SnoozeSection(settings = settings, vm = vm)
 
             Spacer(Modifier.height(16.dp))
         }
@@ -183,13 +156,6 @@ private fun SectionLabel(text: String) {
     )
 }
 
-@Composable
-private fun SnoozeButton(label: String, durationMs: Long, vm: MainViewModel) {
-    Button(onClick = { vm.snooze(durationMs) }) {
-        Text(label)
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NodeSelector(
@@ -200,7 +166,6 @@ private fun NodeSelector(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    // Build display options: "All watches" + each discovered node
     val allOption = VibeConstants.VALUE_TARGET_NODE_ALL to "All watches"
     val options = listOf(allOption) + nodes
 

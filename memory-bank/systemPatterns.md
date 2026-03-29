@@ -1,6 +1,6 @@
 # VILD – System Patterns
 
-> Last updated: 2026-03-29
+> Last updated: 2026-03-29T15:16 UTC-6
 
 ## Architecture Overview
 
@@ -8,9 +8,11 @@
 graph TD
     subgraph Phone
         UI[MainActivity - Compose UI]
+        VibSec[VibrationSection - Compose]
+        SnoozeSec[SnoozeSection - Compose]
         VM[MainViewModel]
         Repo[AppSettingsRepository - DataStore]
-        Sync[WearSyncManager - DataClient]
+        Sync[WearSyncManager - DataClient + MessageClient]
     end
 
     subgraph Shared
@@ -18,20 +20,26 @@ graph TD
     end
 
     subgraph Watch
-        Listener[VibeDataListenerService]
+        Listener[VibeDataListenerService - Data + Messages]
         WRepo[VibeSettingsRepository - SharedPrefs]
         Sched[VibeScheduler - AlarmManager]
         Recv[VibeReceiver - BroadcastReceiver]
+        VibHelp[VibrationHelper - vibration logic]
     end
 
     UI --> VM
+    VibSec --> VM
+    SnoozeSec --> VM
     VM --> Repo
     VM --> Sync
     Sync -->|DataClient.putDataItem| Listener
+    Sync -->|MessageClient.sendMessage| Listener
     Listener --> WRepo
     Listener --> Sched
+    Listener -->|vibrate now| VibHelp
     Sched -->|AlarmManager| Recv
-    Recv -->|vibrate + reschedule| Sched
+    Recv --> VibHelp
+    Recv --> Sched
     Const -.->|used by| Sync
     Const -.->|used by| Listener
     Const -.->|used by| Repo
@@ -40,7 +48,7 @@ graph TD
 
 ## Key Patterns
 
-### 1. Unidirectional Data Flow (Phone → Watch)
+### 1. Unidirectional Data Flow - Phone to Watch
 
 Settings flow in one direction only:
 1. User changes a setting in the Compose UI.
@@ -80,24 +88,48 @@ Before scheduling an alarm, `VibeScheduler.isThisNodeTargeted()` checks:
 - **Phone side**: Uses Jetpack DataStore Preferences (reactive `Flow`-based API).
 - **Watch side**: Uses plain `SharedPreferences` (simpler, synchronous reads needed by `VibeReceiver`).
 
+### 8. Dual Communication Channels - NEW
+
+- **DataClient** (`putDataItem`) — for persistent settings that must survive disconnections. Used for all configuration (intensity, frequency, snooze, pattern, etc.).
+- **MessageClient** (`sendMessage`) — for fire-and-forget commands. Used for the "Vibrate Now" one-shot command. Does not persist; requires the watch to be connected.
+
+### 9. Extracted VibrationHelper - NEW
+
+Vibration logic is extracted from `VibeReceiver` into a standalone `VibrationHelper` object. This allows both scheduled vibrations (from `VibeReceiver`) and immediate vibrations (from `VibeDataListenerService.onMessageReceived()`) to share the same pattern/intensity/duration logic.
+
+### 10. UI Decomposition - NEW
+
+The phone Compose UI is split into focused composable files to keep each under 500 lines:
+- `MainActivity.kt` — scaffold, master toggle, node selector, frequency sliders
+- `ui/VibrationSection.kt` — intensity, duration, pattern, repeat, Vibrate Now button
+- `ui/SnoozeSection.kt` — countdown, default snooze buttons, custom snooze management
+
 ## File Organization
 
 ```
 VILD/
-├── app/                          # Phone companion (com.example.vild)
+├── app/                          # Phone companion - com.example.vild
 │   └── src/main/java/.../
 │       ├── MainActivity.kt       # Compose UI entry point
 │       ├── MainViewModel.kt      # UI state + coordination
-│       └── data/
-│           ├── AppSettingsRepository.kt  # DataStore persistence
-│           └── WearSyncManager.kt        # Data Layer push
-├── wear/                         # Wear OS worker (com.example.vild.wear)
+│       ├── data/
+│       │   ├── AppSettingsRepository.kt  # DataStore persistence
+│       │   └── WearSyncManager.kt        # Data Layer push + MessageClient
+│       └── ui/
+│           ├── VibrationSection.kt       # Vibration settings composables - NEW
+│           ├── SnoozeSection.kt          # Snooze composables - NEW
+│           └── theme/                    # Material 3 theme
+├── wear/                         # Wear OS worker - com.example.vild.wear
 │   └── src/main/java/.../wear/
-│       ├── VibeDataListenerService.kt    # Data Layer listener
+│       ├── MainActivity.kt               # Minimal launcher - calls finish
+│       ├── VibeDataListenerService.kt    # Data Layer + Message listener
 │       ├── VibeSettingsRepository.kt     # SharedPreferences storage
 │       ├── VibeScheduler.kt              # AlarmManager scheduling
-│       └── VibeReceiver.kt              # Vibration + reschedule
-└── shared/                       # Shared library (com.example.vild.shared)
-    └── src/main/java/.../shared/
-        └── VibeConstants.kt              # Paths and keys
+│       ├── VibeReceiver.kt               # Alarm handler - delegates to VibrationHelper
+│       └── VibrationHelper.kt            # Vibration logic with patterns - NEW
+├── shared/                       # Shared library - com.example.vild.shared
+│   └── src/main/java/.../shared/
+│       └── VibeConstants.kt              # Paths and keys
+└── plans/
+    └── new-features-plan.md              # Detailed implementation plan
 ```

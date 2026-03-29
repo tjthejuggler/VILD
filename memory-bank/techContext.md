@@ -1,6 +1,6 @@
 # VILD – Tech Context
 
-> Last updated: 2026-03-29
+> Last updated: 2026-03-29T15:17 UTC-6
 
 ## Build System
 
@@ -46,7 +46,9 @@
   - `USE_EXACT_ALARM`
 - Manifest declares:
   - `uses-feature android.hardware.type.watch`
+  - `MainActivity` with LAUNCHER intent filter (calls `finish()` immediately)
   - `VibeDataListenerService` with `DATA_CHANGED` intent filter for `wear:///vibe_settings`
+  - `VibeDataListenerService` with `MESSAGE_RECEIVED` intent filter for `wear:///vibrate_now` (planned)
   - `VibeReceiver` (not exported)
 
 ### `:shared` (Library)
@@ -63,15 +65,25 @@
 | `goAsync()` + coroutine in receiver | Allows suspend calls within BroadcastReceiver lifecycle |
 | SharedPreferences on watch | Synchronous reads needed by AlarmManager/BroadcastReceiver context |
 | DataStore on phone | Reactive Flow-based API suits Compose UI observation |
-| No watch-side Activity | Watch is headless; all config done from phone |
+| No watch-side Activity UI | Watch is headless; all config done from phone |
 | `WakeLock` with 3s timeout | Prevents device sleeping during vibration + reschedule |
+| `MessageClient` for vibrate-now (planned) | Fire-and-forget semantics; no persistent state needed for one-shot commands |
+| `VibrationHelper` extraction (planned) | Shared vibration logic between scheduled and immediate vibrations |
+| UI decomposition into section files (planned) | Keep files under 500 lines per project guidelines |
 
 ## Data Layer Communication
 
-- **Path**: `/vibe_settings`
-- **Mechanism**: `DataClient.putDataItem()` (phone) → `WearableListenerService.onDataChanged()` (watch)
-- **Delivery**: Automatic to all paired nodes; queued for offline nodes
-- **Keys**: Defined in `VibeConstants` — `is_enabled`, `freq_min_minutes`, `freq_max_minutes`, `vibration_intensity`, `snooze_until_timestamp`, `target_node_id`
+- **Settings Path**: `/vibe_settings`
+- **Settings Mechanism**: `DataClient.putDataItem()` (phone) → `WearableListenerService.onDataChanged()` (watch)
+- **Settings Delivery**: Automatic to all paired nodes; queued for offline nodes
+- **Settings Keys**: Defined in `VibeConstants` — `is_enabled`, `freq_min_minutes`, `freq_max_minutes`, `vibration_intensity`, `snooze_until_timestamp`, `target_node_id`
+- **Planned new keys**: `vibration_duration_ms`, `vibration_pattern_type`, `vibration_repeat_count`
+
+### Message Communication (Planned)
+
+- **Vibrate-Now Path**: `/vibrate_now`
+- **Mechanism**: `MessageClient.sendMessage()` (phone) → `WearableListenerService.onMessageReceived()` (watch)
+- **Delivery**: Requires watch to be currently connected; not queued for offline nodes
 
 ## Development Environment
 

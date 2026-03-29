@@ -9,7 +9,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.vild.wear"
+        applicationId = "com.example.vild"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -40,6 +40,8 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    // Compose activity host (required for setContent in ComponentActivity)
+    implementation(libs.androidx.activity.compose)
     // Shared constants (Data Layer paths & keys)
     implementation(project(":shared"))
     // Wearable Data Layer API

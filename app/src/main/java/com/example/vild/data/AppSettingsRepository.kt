@@ -29,6 +29,10 @@ class AppSettingsRepository(private val context: Context) {
     private val keyIntensity = intPreferencesKey(VibeConstants.KEY_VIBRATION_INTENSITY)
     private val keySnoozeUntil = longPreferencesKey(VibeConstants.KEY_SNOOZE_UNTIL_TIMESTAMP)
     private val keyTargetNodeId = stringPreferencesKey(VibeConstants.KEY_TARGET_NODE_ID)
+    private val keyVibrationDurationMs = longPreferencesKey(VibeConstants.KEY_VIBRATION_DURATION_MS)
+    private val keyVibrationPatternType = stringPreferencesKey(VibeConstants.KEY_VIBRATION_PATTERN_TYPE)
+    private val keyVibrationRepeatCount = intPreferencesKey(VibeConstants.KEY_VIBRATION_REPEAT_COUNT)
+    private val keyCustomSnoozeDurations = stringPreferencesKey("custom_snooze_durations")
 
     // ── Read ─────────────────────────────────────────────────────────────────
 
@@ -40,6 +44,14 @@ class AppSettingsRepository(private val context: Context) {
             vibrationIntensity = prefs[keyIntensity] ?: 128,
             snoozeUntilTimestamp = prefs[keySnoozeUntil] ?: 0L,
             targetNodeId = prefs[keyTargetNodeId] ?: VibeConstants.VALUE_TARGET_NODE_ALL,
+            vibrationDurationMs = prefs[keyVibrationDurationMs] ?: 500L,
+            vibrationPatternType = prefs[keyVibrationPatternType] ?: "single",
+            vibrationRepeatCount = prefs[keyVibrationRepeatCount] ?: 1,
+            customSnoozeDurations = prefs[keyCustomSnoozeDurations]
+                ?.split(",")
+                ?.filter { it.isNotBlank() }
+                ?.map { it.toLong() }
+                ?: emptyList(),
         )
     }
 
@@ -53,6 +65,10 @@ class AppSettingsRepository(private val context: Context) {
             prefs[keyIntensity] = settings.vibrationIntensity
             prefs[keySnoozeUntil] = settings.snoozeUntilTimestamp
             prefs[keyTargetNodeId] = settings.targetNodeId
+            prefs[keyVibrationDurationMs] = settings.vibrationDurationMs
+            prefs[keyVibrationPatternType] = settings.vibrationPatternType
+            prefs[keyVibrationRepeatCount] = settings.vibrationRepeatCount
+            prefs[keyCustomSnoozeDurations] = settings.customSnoozeDurations.joinToString(",")
         }
     }
 }
@@ -67,4 +83,9 @@ data class VibeSettings(
     val vibrationIntensity: Int = 128,
     val snoozeUntilTimestamp: Long = 0L,
     val targetNodeId: String = VibeConstants.VALUE_TARGET_NODE_ALL,
+    val vibrationDurationMs: Long = 500L,
+    val vibrationPatternType: String = "single",
+    val vibrationRepeatCount: Int = 1,
+    /** Stored as comma-separated string in DataStore; phone-UI concern only. */
+    val customSnoozeDurations: List<Long> = emptyList(),
 )

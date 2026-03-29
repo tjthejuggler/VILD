@@ -1,6 +1,6 @@
 # VILD – Progress
 
-> Last updated: 2026-03-29
+> Last updated: 2026-03-29T15:17 UTC-6
 
 ## Completed
 
@@ -11,6 +11,7 @@
 - [x] `:wear` — `VibeScheduler` (AlarmManager exact alarms with target-node filtering)
 - [x] `:wear` — `VibeReceiver` (vibration + reschedule with WakeLock and goAsync)
 - [x] `:wear` — AndroidManifest with permissions and service/receiver declarations
+- [x] `:wear` — Minimal `MainActivity` for Android Studio run configuration (calls `finish()`)
 - [x] `:app` — `AppSettingsRepository` (DataStore Preferences with Flow)
 - [x] `:app` — `WearSyncManager` (Data Layer push with setUrgent)
 - [x] `:app` — `MainViewModel` (AndroidViewModel coordinating repo + sync)
@@ -19,18 +20,34 @@
 - [x] Multi-watch support via target node ID filtering
 - [x] README.md documentation
 - [x] Memory bank initialization
+- [x] New features architecture plan created (`plans/new-features-plan.md`)
 
 ## In Progress
 
-- Nothing currently in progress.
+- Nothing currently in progress — awaiting implementation of planned features.
 
-## Not Yet Started
+## Not Yet Started — New Features
+
+- [ ] Add new constants to `VibeConstants` (vibration duration, pattern type, repeat count, vibrate-now path)
+- [ ] Update `VibeSettings` data class with new vibration fields + custom snooze durations
+- [ ] Update `AppSettingsRepository` with new DataStore keys
+- [ ] Update `WearSyncManager` — push new fields + add `sendVibrateNow()` via MessageClient
+- [ ] Update watch-side `VibeSettingsRepository` — new field getters/setters
+- [ ] Create `VibrationHelper` on watch (extracted vibration logic with pattern support)
+- [ ] Update `VibeReceiver` to delegate to `VibrationHelper`
+- [ ] Update `VibeDataListenerService` — handle new fields + add `onMessageReceived()` for vibrate-now
+- [ ] Update `wear/AndroidManifest.xml` — add MESSAGE_RECEIVED intent filter
+- [ ] Update `MainViewModel` — new update methods, vibrateNow, custom snooze, countdown
+- [ ] Create `app/ui/VibrationSection.kt` — vibration settings UI + Vibrate Now button
+- [ ] Create `app/ui/SnoozeSection.kt` — snooze countdown + custom snooze management
+- [ ] Refactor `MainActivity.kt` to use extracted section composables
+- [ ] Update README.md with new features documentation
+
+## Not Yet Started — Infrastructure
 
 - [ ] Physical device testing (phone + Wear OS watch pairing)
 - [ ] Exact alarm permission handling (Android 12+ runtime prompt)
 - [ ] Error handling and edge case coverage
-- [ ] Watch-side status UI (optional)
-- [ ] Notification channel for snooze/status feedback (optional)
 - [ ] Release build configuration (signing, ProGuard)
 - [ ] CI/CD pipeline
 
@@ -40,6 +57,11 @@ All three modules are implemented and wired together. The data flow is complete:
 
 ```
 Phone UI → ViewModel → DataStore + DataClient → Data Layer → Watch Listener → SharedPrefs → AlarmManager → BroadcastReceiver → Vibration → Reschedule
+```
+
+Planned addition:
+```
+Phone UI → ViewModel → MessageClient → Watch Listener → VibrationHelper → Immediate Vibration
 ```
 
 ## Known Issues

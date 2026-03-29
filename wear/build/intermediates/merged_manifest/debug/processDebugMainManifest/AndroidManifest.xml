@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.vild.wear"
+    package="com.example.vild"
     android:versionCode="1"
     android:versionName="1.0" >
 
@@ -16,10 +16,10 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <permission
-        android:name="com.example.vild.wear.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        android:name="com.example.vild.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         android:protectionLevel="signature" />
 
-    <uses-permission android:name="com.example.vild.wear.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+    <uses-permission android:name="com.example.vild.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
 
     <application
         android:allowBackup="true"
@@ -42,7 +42,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Listens for vibe settings pushed from the mobile app via the Data Layer -->
+        <!--
+             Listens for vibe settings pushed from the mobile app via the Data Layer,
+             and handles immediate vibrate-now messages via MessageClient
+        -->
         <service
             android:name="com.example.vild.wear.VibeDataListenerService"
             android:exported="true" >
@@ -52,6 +55,14 @@
                 <data
                     android:host="*"
                     android:pathPrefix="/vibe_settings"
+                    android:scheme="wear" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+
+                <data
+                    android:host="*"
+                    android:pathPrefix="/vibrate_now"
                     android:scheme="wear" />
             </intent-filter>
         </service>
@@ -68,7 +79,7 @@
 
         <provider
             android:name="androidx.startup.InitializationProvider"
-            android:authorities="com.example.vild.wear.androidx-startup"
+            android:authorities="com.example.vild.androidx-startup"
             android:exported="false" >
             <meta-data
                 android:name="androidx.emoji2.text.EmojiCompatInitializer"

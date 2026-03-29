@@ -1,6 +1,6 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-03-29T21:00 UTC
+> Last updated: 2026-03-29T21:31 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
 
@@ -125,6 +125,13 @@ VibeScheduler           VibeScheduler
 ---
 
 ## Changelog
+
+### 2026-03-29T21:31 UTC
+- Replaced `finish()`-only [`wear/src/main/java/com/example/vild/wear/MainActivity.kt`](wear/src/main/java/com/example/vild/wear/MainActivity.kt) with a persistent Wear OS Compose UI (`ComponentActivity` + `setContent`). The screen displays "VILD is active. Configure settings from your phone." — keeping the activity alive so the OS does not kill `VibeDataListenerService`.
+- Added a **Test Vibration** button to the watch UI that calls `VibrationHelper.vibrate(context)` directly, allowing on-device verification of the vibrator.
+- Added `androidx-activity-compose` dependency to [`wear/build.gradle.kts`](wear/build.gradle.kts) (required for `setContent` in `ComponentActivity`).
+- Confirmed `android.permission.VIBRATE` is present in [`wear/src/main/AndroidManifest.xml`](wear/src/main/AndroidManifest.xml) ✅
+- Confirmed `VibeDataListenerService` is registered with both `DATA_CHANGED` and `MESSAGE_RECEIVED` intent filters in the wear manifest ✅
 
 ### 2026-03-29T21:00 UTC
 - Added `alias(libs.plugins.android.library) apply false` to root [`build.gradle.kts`](build.gradle.kts) — fixes "plugin already on classpath with unknown version" Gradle error for the `:shared` module.

@@ -1,6 +1,6 @@
 1<?xml version="1.0" encoding="utf-8"?>
 2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-3    package="com.example.vild.wear"
+3    package="com.example.vild"
 4    android:versionCode="1"
 5    android:versionName="1.0" >
 6
@@ -27,17 +27,17 @@
 17
 18    <permission
 18-->[androidx.core:core:1.18.0] /home/twain/.gradle/caches/8.13/transforms/fc7d0b51412d459be63f95fac4eac640/transformed/core-1.18.0/AndroidManifest.xml:22:5-24:47
-19        android:name="com.example.vild.wear.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+19        android:name="com.example.vild.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 19-->[androidx.core:core:1.18.0] /home/twain/.gradle/caches/8.13/transforms/fc7d0b51412d459be63f95fac4eac640/transformed/core-1.18.0/AndroidManifest.xml:23:9-81
 20        android:protectionLevel="signature" />
 20-->[androidx.core:core:1.18.0] /home/twain/.gradle/caches/8.13/transforms/fc7d0b51412d459be63f95fac4eac640/transformed/core-1.18.0/AndroidManifest.xml:24:9-44
 21
-22    <uses-permission android:name="com.example.vild.wear.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+22    <uses-permission android:name="com.example.vild.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
 22-->[androidx.core:core:1.18.0] /home/twain/.gradle/caches/8.13/transforms/fc7d0b51412d459be63f95fac4eac640/transformed/core-1.18.0/AndroidManifest.xml:26:5-97
 22-->[androidx.core:core:1.18.0] /home/twain/.gradle/caches/8.13/transforms/fc7d0b51412d459be63f95fac4eac640/transformed/core-1.18.0/AndroidManifest.xml:26:22-94
 23
 24    <application
-24-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:11:5-45:19
+24-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:11:5-53:19
 25        android:allowBackup="true"
 25-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:12:9-35
 26        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
@@ -71,119 +71,137 @@
 42            </intent-filter>
 43        </activity>
 44
-45        <!-- Listens for vibe settings pushed from the mobile app via the Data Layer -->
-46        <service
-46-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:28:9-38:19
-47            android:name="com.example.vild.wear.VibeDataListenerService"
-47-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:29:13-52
-48            android:exported="true" >
-48-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:30:13-36
-49            <intent-filter>
-49-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:31:13-37:29
-50                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
-50-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:32:17-87
-50-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:32:25-84
-51
-52                <data
-52-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:33:17-36:45
-53                    android:host="*"
-53-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:34:21-37
-54                    android:pathPrefix="/vibe_settings"
-54-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:35:21-56
-55                    android:scheme="wear" />
-55-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:36:21-42
-56            </intent-filter>
-57        </service>
-58
-59        <!-- Handles AlarmManager broadcasts to fire vibrations -->
-60        <receiver
-60-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:41:9-43:40
-61            android:name="com.example.vild.wear.VibeReceiver"
-61-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:42:13-41
-62            android:exported="false" />
-62-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:43:13-37
-63
-64        <activity
-64-->[com.google.android.gms:play-services-base:18.5.0] /home/twain/.gradle/caches/8.13/transforms/0b9d147e1b97c82d421fde891f4bd6f2/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:9-173
-65            android:name="com.google.android.gms.common.api.GoogleApiActivity"
-65-->[com.google.android.gms:play-services-base:18.5.0] /home/twain/.gradle/caches/8.13/transforms/0b9d147e1b97c82d421fde891f4bd6f2/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:19-85
-66            android:exported="false"
-66-->[com.google.android.gms:play-services-base:18.5.0] /home/twain/.gradle/caches/8.13/transforms/0b9d147e1b97c82d421fde891f4bd6f2/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:146-170
-67            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-67-->[com.google.android.gms:play-services-base:18.5.0] /home/twain/.gradle/caches/8.13/transforms/0b9d147e1b97c82d421fde891f4bd6f2/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:86-145
-68
-69        <provider
-69-->[androidx.emoji2:emoji2:1.3.0] /home/twain/.gradle/caches/8.13/transforms/80bc7ce383e4b660facf61b6b76eb39a/transformed/emoji2-1.3.0/AndroidManifest.xml:24:9-32:20
-70            android:name="androidx.startup.InitializationProvider"
-70-->[androidx.emoji2:emoji2:1.3.0] /home/twain/.gradle/caches/8.13/transforms/80bc7ce383e4b660facf61b6b76eb39a/transformed/emoji2-1.3.0/AndroidManifest.xml:25:13-67
-71            android:authorities="com.example.vild.wear.androidx-startup"
-71-->[androidx.emoji2:emoji2:1.3.0] /home/twain/.gradle/caches/8.13/transforms/80bc7ce383e4b660facf61b6b76eb39a/transformed/emoji2-1.3.0/AndroidManifest.xml:26:13-68
-72            android:exported="false" >
-72-->[androidx.emoji2:emoji2:1.3.0] /home/twain/.gradle/caches/8.13/transforms/80bc7ce383e4b660facf61b6b76eb39a/transformed/emoji2-1.3.0/AndroidManifest.xml:27:13-37
-73            <meta-data
-73-->[androidx.emoji2:emoji2:1.3.0] /home/twain/.gradle/caches/8.13/transforms/80bc7ce383e4b660facf61b6b76eb39a/transformed/emoji2-1.3.0/AndroidManifest.xml:29:13-31:52
-74                android:name="androidx.emoji2.text.EmojiCompatInitializer"
-74-->[androidx.emoji2:emoji2:1.3.0] /home/twain/.gradle/caches/8.13/transforms/80bc7ce383e4b660facf61b6b76eb39a/transformed/emoji2-1.3.0/AndroidManifest.xml:30:17-75
-75                android:value="androidx.startup" />
-75-->[androidx.emoji2:emoji2:1.3.0] /home/twain/.gradle/caches/8.13/transforms/80bc7ce383e4b660facf61b6b76eb39a/transformed/emoji2-1.3.0/AndroidManifest.xml:31:17-49
-76            <meta-data
-76-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/twain/.gradle/caches/8.13/transforms/2005aa5feb7e08d12904f5b2d423c478/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:29:13-31:52
-77                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
-77-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/twain/.gradle/caches/8.13/transforms/2005aa5feb7e08d12904f5b2d423c478/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:30:17-78
-78                android:value="androidx.startup" />
-78-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/twain/.gradle/caches/8.13/transforms/2005aa5feb7e08d12904f5b2d423c478/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:31:17-49
-79            <meta-data
-79-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:29:13-31:52
-80                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
-80-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:30:17-85
-81                android:value="androidx.startup" />
-81-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:31:17-49
-82        </provider>
-83
-84        <meta-data
-84-->[com.google.android.gms:play-services-basement:18.4.0] /home/twain/.gradle/caches/8.13/transforms/831ab3ff8a10bb557e6a290601434dc7/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:9-122
-85            android:name="com.google.android.gms.version"
-85-->[com.google.android.gms:play-services-basement:18.4.0] /home/twain/.gradle/caches/8.13/transforms/831ab3ff8a10bb557e6a290601434dc7/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:20-65
-86            android:value="@integer/google_play_services_version" />
-86-->[com.google.android.gms:play-services-basement:18.4.0] /home/twain/.gradle/caches/8.13/transforms/831ab3ff8a10bb557e6a290601434dc7/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:66-119
-87
-88        <receiver
-88-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:34:9-52:20
-89            android:name="androidx.profileinstaller.ProfileInstallReceiver"
-89-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:35:13-76
-90            android:directBootAware="false"
-90-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:36:13-44
-91            android:enabled="true"
-91-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:37:13-35
-92            android:exported="true"
-92-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:38:13-36
-93            android:permission="android.permission.DUMP" >
-93-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:39:13-57
-94            <intent-filter>
-94-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:40:13-42:29
-95                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
-95-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:17-91
-95-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:25-88
-96            </intent-filter>
-97            <intent-filter>
-97-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:43:13-45:29
-98                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
-98-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:17-85
-98-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:25-82
-99            </intent-filter>
-100            <intent-filter>
-100-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:46:13-48:29
-101                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
-101-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:17-88
-101-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:25-85
-102            </intent-filter>
-103            <intent-filter>
-103-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:49:13-51:29
-104                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
-104-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:17-95
-104-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:25-92
-105            </intent-filter>
-106        </receiver>
-107    </application>
-108
-109</manifest>
+45        <!--
+46             Listens for vibe settings pushed from the mobile app via the Data Layer,
+47             and handles immediate vibrate-now messages via MessageClient
+48        -->
+49        <service
+49-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:29:9-46:19
+50            android:name="com.example.vild.wear.VibeDataListenerService"
+50-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:30:13-52
+51            android:exported="true" >
+51-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:31:13-36
+52            <intent-filter>
+52-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:32:13-38:29
+53                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+53-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:33:17-87
+53-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:33:25-84
+54
+55                <data
+55-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:34:17-37:45
+56                    android:host="*"
+56-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:35:21-37
+57                    android:pathPrefix="/vibe_settings"
+57-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:36:21-56
+58                    android:scheme="wear" />
+58-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:37:21-42
+59            </intent-filter>
+60            <intent-filter>
+60-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:39:13-45:29
+61                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+61-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:40:17-91
+61-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:40:25-88
+62
+63                <data
+63-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:34:17-37:45
+64                    android:host="*"
+64-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:35:21-37
+65                    android:pathPrefix="/vibrate_now"
+65-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:36:21-56
+66                    android:scheme="wear" />
+66-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:37:21-42
+67            </intent-filter>
+68        </service>
+69
+70        <!-- Handles AlarmManager broadcasts to fire vibrations -->
+71        <receiver
+71-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:49:9-51:40
+72            android:name="com.example.vild.wear.VibeReceiver"
+72-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:50:13-41
+73            android:exported="false" />
+73-->/home/twain/AndroidStudioProjects/VILD/wear/src/main/AndroidManifest.xml:51:13-37
+74
+75        <activity
+75-->[com.google.android.gms:play-services-base:18.5.0] /home/twain/.gradle/caches/8.13/transforms/0b9d147e1b97c82d421fde891f4bd6f2/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:9-173
+76            android:name="com.google.android.gms.common.api.GoogleApiActivity"
+76-->[com.google.android.gms:play-services-base:18.5.0] /home/twain/.gradle/caches/8.13/transforms/0b9d147e1b97c82d421fde891f4bd6f2/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:19-85
+77            android:exported="false"
+77-->[com.google.android.gms:play-services-base:18.5.0] /home/twain/.gradle/caches/8.13/transforms/0b9d147e1b97c82d421fde891f4bd6f2/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:146-170
+78            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+78-->[com.google.android.gms:play-services-base:18.5.0] /home/twain/.gradle/caches/8.13/transforms/0b9d147e1b97c82d421fde891f4bd6f2/transformed/play-services-base-18.5.0/AndroidManifest.xml:5:86-145
+79
+80        <provider
+80-->[androidx.emoji2:emoji2:1.4.0] /home/twain/.gradle/caches/8.13/transforms/8096aeec9482e4be73486eccf17ecbca/transformed/emoji2-1.4.0/AndroidManifest.xml:24:9-32:20
+81            android:name="androidx.startup.InitializationProvider"
+81-->[androidx.emoji2:emoji2:1.4.0] /home/twain/.gradle/caches/8.13/transforms/8096aeec9482e4be73486eccf17ecbca/transformed/emoji2-1.4.0/AndroidManifest.xml:25:13-67
+82            android:authorities="com.example.vild.androidx-startup"
+82-->[androidx.emoji2:emoji2:1.4.0] /home/twain/.gradle/caches/8.13/transforms/8096aeec9482e4be73486eccf17ecbca/transformed/emoji2-1.4.0/AndroidManifest.xml:26:13-68
+83            android:exported="false" >
+83-->[androidx.emoji2:emoji2:1.4.0] /home/twain/.gradle/caches/8.13/transforms/8096aeec9482e4be73486eccf17ecbca/transformed/emoji2-1.4.0/AndroidManifest.xml:27:13-37
+84            <meta-data
+84-->[androidx.emoji2:emoji2:1.4.0] /home/twain/.gradle/caches/8.13/transforms/8096aeec9482e4be73486eccf17ecbca/transformed/emoji2-1.4.0/AndroidManifest.xml:29:13-31:52
+85                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+85-->[androidx.emoji2:emoji2:1.4.0] /home/twain/.gradle/caches/8.13/transforms/8096aeec9482e4be73486eccf17ecbca/transformed/emoji2-1.4.0/AndroidManifest.xml:30:17-75
+86                android:value="androidx.startup" />
+86-->[androidx.emoji2:emoji2:1.4.0] /home/twain/.gradle/caches/8.13/transforms/8096aeec9482e4be73486eccf17ecbca/transformed/emoji2-1.4.0/AndroidManifest.xml:31:17-49
+87            <meta-data
+87-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/twain/.gradle/caches/8.13/transforms/2005aa5feb7e08d12904f5b2d423c478/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:29:13-31:52
+88                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+88-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/twain/.gradle/caches/8.13/transforms/2005aa5feb7e08d12904f5b2d423c478/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:30:17-78
+89                android:value="androidx.startup" />
+89-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/twain/.gradle/caches/8.13/transforms/2005aa5feb7e08d12904f5b2d423c478/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:31:17-49
+90            <meta-data
+90-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:29:13-31:52
+91                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+91-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:30:17-85
+92                android:value="androidx.startup" />
+92-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:31:17-49
+93        </provider>
+94
+95        <meta-data
+95-->[com.google.android.gms:play-services-basement:18.4.0] /home/twain/.gradle/caches/8.13/transforms/831ab3ff8a10bb557e6a290601434dc7/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:9-122
+96            android:name="com.google.android.gms.version"
+96-->[com.google.android.gms:play-services-basement:18.4.0] /home/twain/.gradle/caches/8.13/transforms/831ab3ff8a10bb557e6a290601434dc7/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:20-65
+97            android:value="@integer/google_play_services_version" />
+97-->[com.google.android.gms:play-services-basement:18.4.0] /home/twain/.gradle/caches/8.13/transforms/831ab3ff8a10bb557e6a290601434dc7/transformed/play-services-basement-18.4.0/AndroidManifest.xml:6:66-119
+98
+99        <receiver
+99-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:34:9-52:20
+100            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+100-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:35:13-76
+101            android:directBootAware="false"
+101-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:36:13-44
+102            android:enabled="true"
+102-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:37:13-35
+103            android:exported="true"
+103-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:38:13-36
+104            android:permission="android.permission.DUMP" >
+104-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:39:13-57
+105            <intent-filter>
+105-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:40:13-42:29
+106                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+106-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:17-91
+106-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:25-88
+107            </intent-filter>
+108            <intent-filter>
+108-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:43:13-45:29
+109                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+109-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:17-85
+109-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:25-82
+110            </intent-filter>
+111            <intent-filter>
+111-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:46:13-48:29
+112                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+112-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:17-88
+112-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:25-85
+113            </intent-filter>
+114            <intent-filter>
+114-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:49:13-51:29
+115                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+115-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:17-95
+115-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/twain/.gradle/caches/8.13/transforms/74846256081d73e041521ad442badd9a/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:25-92
+116            </intent-filter>
+117        </receiver>
+118    </application>
+119
+120</manifest>
