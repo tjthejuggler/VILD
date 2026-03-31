@@ -1,6 +1,6 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-03-29T23:23 UTC
+> Last updated: 2026-03-31T02:06 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
 
@@ -73,7 +73,7 @@ Phone companion app built with Jetpack Compose.
 
 | Component | Description |
 |-----------|-------------|
-| Day/Night Toggle | Segmented ☀️ Day / 🌙 Night button pair at the top of the screen; each mode stores independent settings |
+| Day/Night Toggle | Segmented ☼ Day / ☽ Night button pair at the top of the screen; each mode stores independent settings |
 | Master Toggle | Switch to enable/disable vibration reminders |
 | Node Selector | Dropdown listing connected Wear OS nodes; select the "active watch" or "All watches" |
 | Frequency Sliders | Min/max interval sliders (1–120 min); min is clamped ≤ max |
@@ -134,6 +134,22 @@ VibeScheduler           VibeScheduler
 ---
 
 ## Changelog
+
+### 2026-03-31T02:06 UTC
+- **Greyscale UI overhaul:**
+  - [`app/src/main/java/com/example/vild/ui/theme/Color.kt`](app/src/main/java/com/example/vild/ui/theme/Color.kt): Replaced all purple/pink Material colours with a 13-step greyscale palette (Black → White).
+  - [`app/src/main/java/com/example/vild/ui/theme/Theme.kt`](app/src/main/java/com/example/vild/ui/theme/Theme.kt): Replaced dynamic/light/dark colour schemes with a single fully-greyscale `darkColorScheme` that overrides every Material 3 colour role (primary, secondary, tertiary, error, surface, background, outline, inverse, scrim). Removed `dynamicColor` and `darkTheme` parameters from `VILDTheme`.
+  - [`app/src/main/java/com/example/vild/MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt): Replaced colour emojis (☀️ → ☼, 🌙 → ☽) in the Day/Night toggle with Unicode text symbols that render in the current text colour (greyscale). The background `Image` retains its original colours.
+  - No changes needed to `VibrationSection.kt`, `SnoozeSection.kt`, or `PresetSection.kt` — they reference colours exclusively through `MaterialTheme.colorScheme.*`, which is now greyscale.
+
+### 2026-03-31T01:43 UTC
+- **Custom app icon & branding:**
+  - Replaced default Android robot launcher icon with custom VILD woven-knot pattern icon (`VILD_icon.png`) for both `:app` and `:wear` modules.
+  - Generated adaptive icon foreground PNGs at all density buckets (mdpi through xxxhdpi) in `drawable-*` folders, with a dark `#1A1A2E` vector background layer.
+  - Generated legacy `ic_launcher.webp` and `ic_launcher_round.webp` at all densities for both modules.
+  - Updated [`wear/src/main/AndroidManifest.xml`](wear/src/main/AndroidManifest.xml) to reference `@mipmap/ic_launcher` and `@mipmap/ic_launcher_round`.
+  - Created `vild_background.webp` (1080×1920) from the center pattern of the icon, used as a non-scrolling background in the phone app UI at 15% opacity.
+  - [`app/src/main/java/com/example/vild/MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt): Wrapped scrollable `Column` in a `Box` with a fixed `Image` background behind the content.
 
 ### 2026-03-29T23:23 UTC
 - **Bug fix – scheduled vibrations never repeating (Doze rate-limiting):**

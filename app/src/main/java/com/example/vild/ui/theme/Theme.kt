@@ -1,58 +1,67 @@
 package com.example.vild.ui.theme
 
-import android.app.Activity
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
+/**
+ * Fully greyscale color scheme – every UI element is black/white/grey.
+ * The background image is the only element that keeps its original colours
+ * (handled at the composable level, not here).
+ */
+private val GreyscaleColorScheme = darkColorScheme(
+    // Primary – used by filled Buttons (container = primary, text = onPrimary)
+    primary = Grey40,
+    onPrimary = White,
+    primaryContainer = Grey30,
+    onPrimaryContainer = White,
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+    // Secondary – used by Night-mode button
+    secondary = Grey30,
+    onSecondary = White,
+    secondaryContainer = Grey30,
+    onSecondaryContainer = White,
 
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    // Tertiary
+    tertiary = Grey30,
+    onTertiary = White,
+    tertiaryContainer = Grey30,
+    onTertiaryContainer = White,
+
+    // Error (greyscale – no red)
+    error = Grey40,
+    onError = White,
+    errorContainer = Grey30,
+    onErrorContainer = White,
+
+    // Background & Surface
+    background = Grey10,
+    onBackground = White,
+    surface = Grey15,
+    onSurface = White,
+    surfaceVariant = Grey20,
+    onSurfaceVariant = White,
+
+    // Outline
+    outline = Grey60,
+    outlineVariant = Grey40,
+
+    // Inverse
+    inverseSurface = White,
+    inverseOnSurface = Black,
+    inversePrimary = Grey40,
+
+    // Scrim
+    scrim = Black,
 )
 
 @Composable
 fun VILDTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = GreyscaleColorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }

@@ -4,7 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,6 +40,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.vild.shared.VibeConstants
@@ -66,94 +71,112 @@ fun VildApp(vm: MainViewModel = viewModel()) {
     val syncStatus by vm.syncStatus.collectAsState()
     val activeMode by vm.activeMode.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("VILD – Vibration Remote") })
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SyncStatusBar(syncStatus = syncStatus)
+    // Full-screen background image behind everything (including TopAppBar).
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(R.drawable.vild_background),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
 
-            DayNightToggle(activeMode = activeMode, onToggle = { vm.toggleMode() })
-
-            // ── Master toggle ────────────────────────────────────────────────
-            SectionLabel("Reminders")
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Enable vibration reminders", style = MaterialTheme.typography.bodyLarge)
-                Switch(
-                    checked = settings.isEnabled,
-                    onCheckedChange = { vm.updateIsEnabled(it) },
+        Scaffold(
+            containerColor = Color.Transparent,
+            contentColor = Color.White,
+            topBar = {
+                TopAppBar(
+                    title = { Text("VILD – Vibration Remote") },
+                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        titleContentColor = Color.White,
+                    ),
                 )
             }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                SyncStatusBar(syncStatus = syncStatus)
 
-            HorizontalDivider()
+                DayNightToggle(activeMode = activeMode, onToggle = { vm.toggleMode() })
 
-            // ── Node selector ────────────────────────────────────────────────
-            SectionLabel("Active Watch")
-            NodeSelector(
-                nodes = nodes.map { it.id to it.displayName },
-                selectedNodeId = settings.targetNodeId,
-                onNodeSelected = { vm.updateTargetNode(it) },
-                onRefresh = { vm.refreshNodes() },
-            )
+                // ── Master toggle ────────────────────────────────────────────
+                SectionLabel("Reminders")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Enable vibration reminders", style = MaterialTheme.typography.bodyLarge)
+                    Switch(
+                        checked = settings.isEnabled,
+                        onCheckedChange = { vm.updateIsEnabled(it) },
+                    )
+                }
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            // ── Frequency ────────────────────────────────────────────────────
-            SectionLabel("Reminder Frequency")
-            Text(
-                "Min interval: ${settings.freqMinMinutes} min",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Slider(
-                value = settings.freqMinMinutes.toFloat(),
-                onValueChange = { vm.updateFreqMin(it.toInt()) },
-                valueRange = 1f..120f,
-                steps = 118,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                "Max interval: ${settings.freqMaxMinutes} min",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Slider(
-                value = settings.freqMaxMinutes.toFloat(),
-                onValueChange = { vm.updateFreqMax(it.toInt()) },
-                valueRange = 1f..120f,
-                steps = 118,
-                modifier = Modifier.fillMaxWidth(),
-            )
+                // ── Node selector ────────────────────────────────────────────
+                SectionLabel("Active Watch")
+                NodeSelector(
+                    nodes = nodes.map { it.id to it.displayName },
+                    selectedNodeId = settings.targetNodeId,
+                    onNodeSelected = { vm.updateTargetNode(it) },
+                    onRefresh = { vm.refreshNodes() },
+                )
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            // ── Vibration settings + Vibrate Now ─────────────────────────────
-            SectionLabel("Vibration")
-            VibrationSection(settings = settings, vm = vm)
+                // ── Frequency ────────────────────────────────────────────────
+                SectionLabel("Reminder Frequency")
+                Text(
+                    "Min interval: ${settings.freqMinMinutes} min",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Slider(
+                    value = settings.freqMinMinutes.toFloat(),
+                    onValueChange = { vm.updateFreqMin(it.toInt()) },
+                    valueRange = 1f..120f,
+                    steps = 118,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "Max interval: ${settings.freqMaxMinutes} min",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Slider(
+                    value = settings.freqMaxMinutes.toFloat(),
+                    onValueChange = { vm.updateFreqMax(it.toInt()) },
+                    valueRange = 1f..120f,
+                    steps = 118,
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            // ── Presets ──────────────────────────────────────────────────────
-            SectionLabel("Presets")
-            PresetSection(vm = vm)
+                // ── Vibration settings + Vibrate Now ─────────────────────────
+                SectionLabel("Vibration")
+                VibrationSection(settings = settings, vm = vm)
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            // ── Snooze ───────────────────────────────────────────────────────
-            SectionLabel("Snooze")
-            SnoozeSection(settings = settings, vm = vm)
+                // ── Presets ──────────────────────────────────────────────────
+                SectionLabel("Presets")
+                PresetSection(vm = vm)
 
-            Spacer(Modifier.height(16.dp))
+                HorizontalDivider()
+
+                // ── Snooze ───────────────────────────────────────────────────
+                SectionLabel("Snooze")
+                SnoozeSection(settings = settings, vm = vm)
+
+                Spacer(Modifier.height(16.dp))
+            }
         }
     }
 }
@@ -161,8 +184,9 @@ fun VildApp(vm: MainViewModel = viewModel()) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * A two-button segmented toggle for switching between Day (☀️) and Night (🌙) modes.
+ * A two-button segmented toggle for switching between Day and Night modes.
  * The active mode button is filled; the inactive one is outlined.
+ * Uses plain-text symbols (not colour emojis) to stay greyscale.
  */
 @Composable
 private fun DayNightToggle(activeMode: String, onToggle: () -> Unit) {
@@ -176,20 +200,20 @@ private fun DayNightToggle(activeMode: String, onToggle: () -> Unit) {
                 onClick = {},
                 modifier = Modifier.weight(1f),
             ) {
-                Text("☀️  Day")
+                Text("☼  Day")
             }
             OutlinedButton(
                 onClick = onToggle,
                 modifier = Modifier.weight(1f),
             ) {
-                Text("🌙  Night")
+                Text("☽  Night")
             }
         } else {
             OutlinedButton(
                 onClick = onToggle,
                 modifier = Modifier.weight(1f),
             ) {
-                Text("☀️  Day")
+                Text("☼  Day")
             }
             Button(
                 onClick = {},
@@ -198,7 +222,7 @@ private fun DayNightToggle(activeMode: String, onToggle: () -> Unit) {
                     containerColor = MaterialTheme.colorScheme.secondary,
                 ),
             ) {
-                Text("🌙  Night")
+                Text("☽  Night")
             }
         }
     }
