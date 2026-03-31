@@ -1,6 +1,6 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-03-31T02:06 UTC
+> Last updated: 2026-03-31T17:45 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
 
@@ -62,17 +62,25 @@ Phone companion app built with Jetpack Compose.
 
 | File | Purpose |
 |------|---------|
+| `data/AdviceItem.kt` | `@Serializable` data class for a user-entered advice item (id, section, text, createdAt) |
+| `data/AdviceRepository.kt` | DataStore-backed repository for CRUD operations on advice items (stored as JSON) |
 | `data/AppSettingsRepository.kt` | DataStore Preferences – persists settings locally on the phone; stores Day/Night mode snapshots as JSON |
 | `data/Preset.kt` | `@Serializable` data class capturing a named snapshot of vibration/scheduling settings |
 | `data/WearSyncManager.kt` | Wearable Data Layer client – pushes settings to all paired nodes |
-| `MainViewModel.kt` | AndroidViewModel – holds UI state, coordinates repo + sync; manages Day/Night mode switching |
-| `MainActivity.kt` | Compose UI entry point |
+| `MainViewModel.kt` | AndroidViewModel – holds UI state, coordinates repo + sync; manages Day/Night mode switching and advice state |
+| `MainActivity.kt` | Compose UI entry point; shows settings screen overlay and advice banner |
+| `ui/advice/AdviceSection.kt` | String constants for the two advice sections ("day" / "night") |
+| `ui/advice/AdviceBanner.kt` | Swipeable banner composable showing random advice; swipe left = next, swipe right = previous |
+| `ui/advice/AdviceDialog.kt` | Full-screen dialog for adding, editing, and deleting advice items |
+| `ui/settings/SettingsScreen.kt` | Settings screen with advice management cards for Day and Night sections |
 | `ui/PresetSection.kt` | Preset save/load/delete UI component |
 
 #### UI Screens / Components
 
 | Component | Description |
 |-----------|-------------|
+| Advice Banner | Swipeable banner at the top of the main screen showing random advice for the active mode (Day or Night); randomizes on app open and mode toggle |
+| Settings Screen | Gear icon in the top bar opens a full-screen settings overlay for managing advice |
 | Day/Night Toggle | Segmented ☼ Day / ☽ Night button pair at the top of the screen; each mode stores independent settings |
 | Master Toggle | Switch to enable/disable vibration reminders |
 | Node Selector | Dropdown listing connected Wear OS nodes; select the "active watch" or "All watches" |
@@ -134,6 +142,17 @@ VibeScheduler           VibeScheduler
 ---
 
 ## Changelog
+
+### 2026-03-31T17:45 UTC
+- **Settings screen & Advice feature** (adapted from wags project):
+  - **New:** [`app/src/main/java/com/example/vild/data/AdviceItem.kt`](app/src/main/java/com/example/vild/data/AdviceItem.kt): `@Serializable` data class for advice items with `id`, `section` ("day"/"night"), `text`, and `createdAt` fields.
+  - **New:** [`app/src/main/java/com/example/vild/data/AdviceRepository.kt`](app/src/main/java/com/example/vild/data/AdviceRepository.kt): DataStore-backed repository for advice CRUD. Stores all advice as JSON in a separate `advice_store` DataStore. Provides reactive `Flow` observation per section.
+  - **New:** [`app/src/main/java/com/example/vild/ui/advice/AdviceSection.kt`](app/src/main/java/com/example/vild/ui/advice/AdviceSection.kt): Constants for the two advice sections (`DAY`, `NIGHT`) with labels and `all` list.
+  - **New:** [`app/src/main/java/com/example/vild/ui/advice/AdviceBanner.kt`](app/src/main/java/com/example/vild/ui/advice/AdviceBanner.kt): Swipeable banner composable with `AnimatedContent` transitions. Swipe left → next random advice, swipe right → previous. Hidden when no advice exists. Max 5 visible lines with silent vertical scroll.
+  - **New:** [`app/src/main/java/com/example/vild/ui/advice/AdviceDialog.kt`](app/src/main/java/com/example/vild/ui/advice/AdviceDialog.kt): Full-screen dialog for managing advice per section — add new advice, inline edit existing items, delete items.
+  - **New:** [`app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt`](app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt): Settings screen with back navigation, containing an Advice card that lists Day and Night sections with item counts and Manage/Add buttons.
+  - [`app/src/main/java/com/example/vild/MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt): Added `AdviceUiState` data class, `adviceRepo`, `_adviceState`/`adviceState` flows. Added advice methods: `randomizeAdvice()`, `nextRandomAdvice()`, `previousAdvice()`, `addAdvice()`, `updateAdvice()`, `deleteAdvice()`. Updated `toggleMode()` to randomize advice for the incoming mode. Advice randomizes on app start.
+  - [`app/src/main/java/com/example/vild/MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt): Added gear icon (`Icons.Default.Settings`) in the top bar that toggles a `SettingsScreen` overlay. Added `AdviceBanner` at the top of the main content area, showing advice for the active mode (day/night). Collects `adviceState` from the ViewModel.
 
 ### 2026-03-31T02:06 UTC
 - **Greyscale UI overhaul:**

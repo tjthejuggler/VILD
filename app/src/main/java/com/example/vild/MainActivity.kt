@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -23,6 +25,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,6 +53,8 @@ import com.example.vild.shared.VibeConstants
 import com.example.vild.ui.PresetSection
 import com.example.vild.ui.SnoozeSection
 import com.example.vild.ui.VibrationSection
+import com.example.vild.ui.advice.AdviceBanner
+import com.example.vild.ui.settings.SettingsScreen
 import com.example.vild.ui.theme.VILDTheme
 
 class MainActivity : ComponentActivity() {
@@ -70,6 +76,20 @@ fun VildApp(vm: MainViewModel = viewModel()) {
     val nodes by vm.nodes.collectAsState()
     val syncStatus by vm.syncStatus.collectAsState()
     val activeMode by vm.activeMode.collectAsState()
+    val adviceState by vm.adviceState.collectAsState()
+
+    var showSettings by remember { mutableStateOf(false) }
+
+    if (showSettings) {
+        SettingsScreen(
+            adviceBySection = adviceState.adviceBySection,
+            onAddAdvice = { section, text -> vm.addAdvice(section, text) },
+            onUpdateAdvice = { item, text -> vm.updateAdvice(item, text) },
+            onDeleteAdvice = { id -> vm.deleteAdvice(id) },
+            onBack = { showSettings = false },
+        )
+        return
+    }
 
     // Full-screen background image behind everything (including TopAppBar).
     Box(modifier = Modifier.fillMaxSize()) {
@@ -86,6 +106,15 @@ fun VildApp(vm: MainViewModel = viewModel()) {
             topBar = {
                 TopAppBar(
                     title = { Text("VILD – Vibration Remote") },
+                    actions = {
+                        IconButton(onClick = { showSettings = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = Color.White,
+                            )
+                        }
+                    },
                     colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,
                         titleContentColor = Color.White,
@@ -101,6 +130,18 @@ fun VildApp(vm: MainViewModel = viewModel()) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                // ── Advice banner ─────────────────────────────────────────────
+                val currentSection = activeMode
+                val adviceList = adviceState.adviceBySection[currentSection] ?: emptyList()
+                val currentIndex = adviceState.currentIndex[currentSection] ?: 0
+                AdviceBanner(
+                    section = currentSection,
+                    adviceList = adviceList,
+                    currentIndex = currentIndex,
+                    onNext = { vm.nextRandomAdvice(currentSection) },
+                    onPrevious = { vm.previousAdvice(currentSection) },
+                )
+
                 SyncStatusBar(syncStatus = syncStatus)
 
                 DayNightToggle(activeMode = activeMode, onToggle = { vm.toggleMode() })

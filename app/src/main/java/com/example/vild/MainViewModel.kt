@@ -4,11 +4,14 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.vild.data.AdviceItem
+import com.example.vild.data.AdviceRepository
 import com.example.vild.data.AppSettingsRepository
 import com.example.vild.data.Preset
 import com.example.vild.data.VibeSettings
 import com.example.vild.data.WearSyncManager
 import com.example.vild.shared.VibeConstants
+import com.example.vild.ui.advice.AdviceSection
 import com.google.android.gms.wearable.Node
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 
@@ -35,6 +39,19 @@ data class SyncStatus(
 )
 
 /**
+ * UI state for the advice feature.
+ *
+ * @property adviceBySection All advice items keyed by section ("day" / "night").
+ * @property currentIndex    Current random-index per section for the banner display.
+ * @property history         History of shown indices per section (for swipe-back).
+ */
+data class AdviceUiState(
+    val adviceBySection: Map<String, List<AdviceItem>> = emptyMap(),
+    val currentIndex: Map<String, Int> = emptyMap(),
+    val history: Map<String, List<Int>> = emptyMap(),
+)
+
+/**
  * Holds all UI state for [MainActivity].
  *
  * On init it loads the last saved settings from [AppSettingsRepository] and
@@ -47,6 +64,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repo = AppSettingsRepository(application)
     private val syncManager = WearSyncManager(application)
+    private val adviceRepo = AdviceRepository(application)
 
     // ── UI state ─────────────────────────────────────────────────────────────
 
@@ -62,6 +80,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** `"day"` or `"night"` — persisted in DataStore. */
     private val _activeMode = MutableStateFlow("day")
     val activeMode: StateFlow<String> = _activeMode.asStateFlow()
+
+    // ── Advice state ──────────────────────────────────────────────────────────
+
+    private val _adviceState = MutableStateFlow(AdviceUiState())
+    val adviceState: StateFlow<AdviceUiState> = _adviceState.asStateFlow()
 
     val presets: StateFlow<List<Preset>> = repo.presetsFlow
         .stateIn(
@@ -102,6 +125,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _settings.value = repo.settingsFlow.first()
         }
         refreshNodes()
+        // Observe advice for both sections
+        AdviceSection.all.forEach { section ->
+            viewModelScope.launch {
+                adviceRepo.observeBySection(section).collect { list ->
+                    _adviceState.update { old ->
+                        val newMap = old.adviceBySection.toMutableMap()
+                        newMap[section] = list
+                        val idx = old.currentIndex[section] ?: 0
+                        val newIdx = if (list.isEmpty()) 0 else idx.coerceIn(0, list.size - 1)
+                        val newIndexMap = old.currentIndex.toMutableMap()
+                        newIndexMap[section] = newIdx
+                        old.copy(adviceBySection = newMap, currentIndex = newIndexMap)
+                    }
+                }
+            }
+        }
+        // Randomize advice for the active mode on app start
+        viewModelScope.launch {
+            // Wait for advice to load
+            delay(500)
+            randomizeAdvice(_activeMode.value)
+        }
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -218,6 +263,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Load the incoming mode's settings and sync
             val incomingSettings = repo.loadModeSettings(incoming)
             updateAndSync(incomingSettings)
+
+            // Randomize advice for the incoming mode
+            randomizeAdvice(incoming)
         }
     }
 
@@ -264,6 +312,67 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Deletes a preset by name. */
     fun deletePreset(name: String) {
         viewModelScope.launch { repo.deletePreset(name) }
+    }
+
+    // ── Advice API ────────────────────────────────────────────────────────────
+
+    /** Picks a fresh random index for [section]. */
+    fun randomizeAdvice(section: String) {
+        _adviceState.update { old ->
+            val list = old.adviceBySection[section] ?: return@update old
+            if (list.isEmpty()) return@update old
+            val newIdx = (0 until list.size).random()
+            val newIndexMap = old.currentIndex.toMutableMap()
+            newIndexMap[section] = newIdx
+            old.copy(currentIndex = newIndexMap)
+        }
+    }
+
+    /** Swipe left → show next random advice (not the same as current). */
+    fun nextRandomAdvice(section: String) {
+        _adviceState.update { old ->
+            val list = old.adviceBySection[section] ?: return@update old
+            if (list.size <= 1) return@update old
+            val currentIdx = old.currentIndex[section] ?: 0
+            var newIdx: Int
+            do {
+                newIdx = (0 until list.size).random()
+            } while (newIdx == currentIdx)
+            val newIndexMap = old.currentIndex.toMutableMap()
+            newIndexMap[section] = newIdx
+            val sectionHistory = (old.history[section] ?: emptyList()) + currentIdx
+            val newHistory = old.history.toMutableMap()
+            newHistory[section] = sectionHistory
+            old.copy(currentIndex = newIndexMap, history = newHistory)
+        }
+    }
+
+    /** Swipe right → go back to previously shown advice. */
+    fun previousAdvice(section: String) {
+        _adviceState.update { old ->
+            val sectionHistory = old.history[section] ?: return@update old
+            if (sectionHistory.isEmpty()) return@update old
+            val prevIdx = sectionHistory.last()
+            val newHistory = old.history.toMutableMap()
+            newHistory[section] = sectionHistory.dropLast(1)
+            val newIndexMap = old.currentIndex.toMutableMap()
+            newIndexMap[section] = prevIdx
+            old.copy(currentIndex = newIndexMap, history = newHistory)
+        }
+    }
+
+    fun addAdvice(section: String, text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch { adviceRepo.add(section, text.trim()) }
+    }
+
+    fun updateAdvice(item: AdviceItem, newText: String) {
+        if (newText.isBlank()) return
+        viewModelScope.launch { adviceRepo.update(item, newText.trim()) }
+    }
+
+    fun deleteAdvice(id: Long) {
+        viewModelScope.launch { adviceRepo.delete(id) }
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
