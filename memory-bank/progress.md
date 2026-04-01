@@ -1,6 +1,6 @@
 # VILD – Progress
 
-> Last updated: 2026-03-29T17:08 UTC-6
+> Last updated: 2026-04-01T09:04 UTC-6
 
 ## Completed
 
@@ -21,6 +21,7 @@
 - [x] README.md documentation
 - [x] Memory bank initialization
 - [x] New features architecture plan created (`plans/new-features-plan.md`)
+- [x] Background redesign: solid black + parallax VILD icon (2026-04-01)
 
 ## In Progress
 

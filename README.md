@@ -1,6 +1,6 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-03-31T17:45 UTC
+> Last updated: 2026-04-01T15:04 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
 
@@ -79,6 +79,7 @@ Phone companion app built with Jetpack Compose.
 
 | Component | Description |
 |-----------|-------------|
+| Background | Solid black with the VILD icon centered at 90% screen width; the icon scrolls at 30% of content speed (parallax effect) at 40% opacity |
 | Advice Banner | Swipeable banner at the top of the main screen showing random advice for the active mode (Day or Night); randomizes on app open and mode toggle |
 | Settings Screen | Gear icon in the top bar opens a full-screen settings overlay for managing advice |
 | Day/Night Toggle | Segmented ☼ Day / ☽ Night button pair at the top of the screen; each mode stores independent settings |

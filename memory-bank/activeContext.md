@@ -59,6 +59,15 @@ Five new features are planned — see [`plans/new-features-plan.md`](../plans/ne
 
 - None currently tracked.
 
+---
+
+### 2026-04-01T09:04 UTC-6 — Background redesign: parallax VILD icon on black
+
+- Replaced the old full-screen `vild_background.webp` crop with a solid black background + the VILD icon (`vild_icon.png`) centered at 90% screen width, maintaining aspect ratio.
+- The icon scrolls at 30% of the content scroll speed (parallax effect) using a shared `ScrollState` and `Modifier.offset { IntOffset(0, -(scrollState.value * 0.3f).toInt()) }`.
+- Icon rendered at 40% alpha so it doesn't overpower the white text content.
+- Old `vild_background.webp` is no longer referenced (can be deleted later).
+
 ## Recent Bug Fixes
 
 ### 2026-03-29T17:23 UTC-6 — Scheduled vibrations never repeating

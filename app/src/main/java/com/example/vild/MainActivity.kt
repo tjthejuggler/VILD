@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -45,8 +47,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.vild.shared.VibeConstants
@@ -91,13 +95,23 @@ fun VildApp(vm: MainViewModel = viewModel()) {
         return
     }
 
-    // Full-screen background image behind everything (including TopAppBar).
-    Box(modifier = Modifier.fillMaxSize()) {
+    // Shared scroll state for parallax effect.
+    val scrollState = rememberScrollState()
+
+    // Solid black background with parallax icon behind everything.
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        // Parallax background icon: moves at 30% of scroll speed.
+        val parallaxOffset = -(scrollState.value * 0.3f)
         Image(
-            painter = painterResource(R.drawable.vild_background),
+            painter = painterResource(R.drawable.vild_icon),
             contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .align(Alignment.Center)
+                .offset { IntOffset(0, parallaxOffset.toInt()) }
+                .graphicsLayer(scaleX = 2.5f, scaleY = 2.5f),
+            contentScale = ContentScale.Fit,
+            alpha = 0.7f,
         )
 
         Scaffold(
@@ -127,7 +141,7 @@ fun VildApp(vm: MainViewModel = viewModel()) {
                     .fillMaxSize()
                     .padding(innerPadding)
                     .padding(horizontal = 16.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // ── Advice banner ─────────────────────────────────────────────
