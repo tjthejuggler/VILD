@@ -17,4 +17,5 @@ data class AdviceItem(
     val section: String,
     val text: String,
     val createdAt: Long = System.currentTimeMillis(),
+    val notes: String = "",
 )

@@ -6,7 +6,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,6 +38,7 @@ import com.example.vild.ui.theme.Grey15
 /**
  * A thin banner that shows a random piece of advice for the given [section].
  * Swipe left → next random advice, swipe right → previous advice.
+ * Tap → opens the notes dialog for the currently shown advice item.
  * Hidden when no advice exists for the section.
  *
  * Shows up to 5 visible lines; longer text is silently scrollable with no
@@ -48,6 +51,7 @@ fun AdviceBanner(
     currentIndex: Int,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
+    onTap: (AdviceItem) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (adviceList.isEmpty()) return
@@ -75,11 +79,15 @@ fun AdviceBanner(
     ) { (_, text) ->
         var dragTotal by remember { mutableFloatStateOf(0f) }
 
+        @OptIn(ExperimentalFoundationApi::class)
         Box(
             modifier = modifier
                 .fillMaxWidth()
                 .heightIn(max = maxBannerHeight)
                 .background(Grey15.copy(alpha = 0.85f))
+                .combinedClickable(
+                    onClick = { onTap(advice) },
+                )
                 .pointerInput(section) {
                     detectHorizontalDragGestures(
                         onDragEnd = {

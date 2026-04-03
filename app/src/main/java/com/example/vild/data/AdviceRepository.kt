@@ -48,6 +48,15 @@ class AdviceRepository(private val context: Context) {
         }
     }
 
+    /** Update the notes for an advice item by id. */
+    suspend fun updateNotes(id: Long, notes: String) {
+        context.adviceDataStore.edit { prefs ->
+            val current = loadAll(prefs)
+            val updated = current.map { if (it.id == id) it.copy(notes = notes) else it }
+            prefs[keyAdvice] = Json.encodeToString(updated)
+        }
+    }
+
     /** Delete an advice item by id. */
     suspend fun delete(id: Long) {
         context.adviceDataStore.edit { prefs ->

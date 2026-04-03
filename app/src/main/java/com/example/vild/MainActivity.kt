@@ -57,7 +57,9 @@ import com.example.vild.shared.VibeConstants
 import com.example.vild.ui.PresetSection
 import com.example.vild.ui.SnoozeSection
 import com.example.vild.ui.VibrationSection
+import com.example.vild.data.AdviceItem
 import com.example.vild.ui.advice.AdviceBanner
+import com.example.vild.ui.advice.AdviceNotesDialog
 import com.example.vild.ui.settings.SettingsScreen
 import com.example.vild.ui.theme.VILDTheme
 
@@ -83,6 +85,7 @@ fun VildApp(vm: MainViewModel = viewModel()) {
     val adviceState by vm.adviceState.collectAsState()
 
     var showSettings by remember { mutableStateOf(false) }
+    var notesAdvice by remember { mutableStateOf<AdviceItem?>(null) }
 
     if (showSettings) {
         SettingsScreen(
@@ -154,7 +157,16 @@ fun VildApp(vm: MainViewModel = viewModel()) {
                     currentIndex = currentIndex,
                     onNext = { vm.nextRandomAdvice(currentSection) },
                     onPrevious = { vm.previousAdvice(currentSection) },
+                    onTap = { item -> notesAdvice = item },
                 )
+
+                notesAdvice?.let { item ->
+                    AdviceNotesDialog(
+                        advice = item,
+                        onSave = { notes -> vm.updateAdviceNotes(item.id, notes) },
+                        onDismiss = { notesAdvice = null },
+                    )
+                }
 
                 SyncStatusBar(syncStatus = syncStatus)
 

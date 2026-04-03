@@ -375,6 +375,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { adviceRepo.delete(id) }
     }
 
+    fun updateAdviceNotes(id: Long, notes: String) {
+        viewModelScope.launch { adviceRepo.updateNotes(id, notes) }
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
     private fun updateAndSync(newSettings: VibeSettings) {

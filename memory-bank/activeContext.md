@@ -61,6 +61,18 @@ Five new features are planned — see [`plans/new-features-plan.md`](../plans/ne
 
 ---
 
+### 2026-04-02T23:22 UTC-6 — Advice notes feature
+
+- Added `notes: String = ""` field to [`AdviceItem`](../app/src/main/java/com/example/vild/data/AdviceItem.kt) (backward-compatible default).
+- Added `updateNotes(id, notes)` to [`AdviceRepository`](../app/src/main/java/com/example/vild/data/AdviceRepository.kt).
+- Added `updateAdviceNotes(id, notes)` to [`MainViewModel`](../app/src/main/java/com/example/vild/MainViewModel.kt).
+- Created [`AdviceNotesDialog`](../app/src/main/java/com/example/vild/ui/advice/AdviceNotesDialog.kt) — a popup composable showing the advice text and a multi-line text field for personal notes. Save persists; Cancel discards.
+- Added `onTap: (AdviceItem) -> Unit` callback to [`AdviceBanner`](../app/src/main/java/com/example/vild/ui/advice/AdviceBanner.kt) using `combinedClickable`.
+- Wired `onTap` in [`MainActivity`](../app/src/main/java/com/example/vild/MainActivity.kt): tapping the banner opens `AdviceNotesDialog` for the currently shown advice item.
+- Build successful, installed on device.
+
+---
+
 ### 2026-04-01T09:04 UTC-6 — Background redesign: parallax VILD icon on black
 
 - Replaced the old full-screen `vild_background.webp` crop with a solid black background + the VILD icon (`vild_icon.png`) centered at 90% screen width, maintaining aspect ratio.

@@ -22,6 +22,7 @@
 - [x] Memory bank initialization
 - [x] New features architecture plan created (`plans/new-features-plan.md`)
 - [x] Background redesign: solid black + parallax VILD icon (2026-04-01)
+- [x] Advice notes feature: tap any advice banner item to open a personal notes popup, persisted per advice item (2026-04-02)
 
 ## In Progress
 
