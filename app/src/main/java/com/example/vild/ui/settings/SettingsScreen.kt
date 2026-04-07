@@ -21,6 +21,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -48,6 +50,9 @@ import com.example.vild.ui.theme.Grey60
 @Composable
 fun SettingsScreen(
     adviceBySection: Map<String, List<AdviceItem>>,
+    isTailInstalled: Boolean,
+    autoSwitchDayOnHabit: Boolean,
+    onAutoSwitchDayOnHabitChanged: (Boolean) -> Unit,
     onAddAdvice: (String, String) -> Unit,
     onUpdateAdvice: (AdviceItem, String) -> Unit,
     onDeleteAdvice: (Long) -> Unit,
@@ -88,6 +93,16 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // ── Tail integration ──────────────────────────────────────────────
+            if (isTailInstalled) {
+                item {
+                    TailIntegrationCard(
+                        autoSwitchDayOnHabit = autoSwitchDayOnHabit,
+                        onToggle = onAutoSwitchDayOnHabitChanged,
+                    )
+                }
+            }
+
             // ── Advice ──────────────────────────────────────────────────────
             item {
                 AdviceSettingsCard(
@@ -171,6 +186,58 @@ private fun AdviceSettingsCard(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+// ── Tail integration card ─────────────────────────────────────────────────────
+
+@Composable
+private fun TailIntegrationCard(
+    autoSwitchDayOnHabit: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = Grey15)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                "Tail Integration",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+            )
+            Text(
+                "Automatically switch from Night to Day mode when you record " +
+                    "a habit in the Tail app (useful as a wake-up signal).",
+                style = MaterialTheme.typography.bodySmall,
+                color = Grey60,
+            )
+
+            HorizontalDivider(color = Grey20)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Auto switch to Day on habit",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = autoSwitchDayOnHabit,
+                    onCheckedChange = onToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color(0xFF4CAF50),
+                    ),
+                )
             }
         }
     }

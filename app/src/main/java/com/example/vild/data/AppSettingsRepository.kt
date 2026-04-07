@@ -45,6 +45,10 @@ class AppSettingsRepository(private val context: Context) {
     private val keyDaySettings = stringPreferencesKey("day_settings_json")
     private val keyNightSettings = stringPreferencesKey("night_settings_json")
 
+    // ── Tail integration keys ────────────────────────────────────────────────
+
+    private val keyAutoSwitchDayOnHabit = booleanPreferencesKey("auto_switch_day_on_habit")
+
     // ── Read ─────────────────────────────────────────────────────────────────
 
     val settingsFlow: Flow<VibeSettings> = context.dataStore.data.map { prefs ->
@@ -74,6 +78,11 @@ class AppSettingsRepository(private val context: Context) {
     /** Emits `"day"` or `"night"` — defaults to `"day"` if never set. */
     val activeModeFlow: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[keyActiveMode] ?: "day"
+    }
+
+    /** Whether to auto-switch from night → day when Tail reports a habit increment. */
+    val autoSwitchDayOnHabitFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[keyAutoSwitchDayOnHabit] ?: false
     }
 
     // ── Write ────────────────────────────────────────────────────────────────
@@ -138,6 +147,11 @@ class AppSettingsRepository(private val context: Context) {
     /** Persists the active mode (`"day"` or `"night"`) to DataStore. */
     suspend fun setActiveMode(mode: String) {
         context.dataStore.edit { prefs -> prefs[keyActiveMode] = mode }
+    }
+
+    /** Persists the auto-switch-day-on-habit toggle. */
+    suspend fun setAutoSwitchDayOnHabit(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[keyAutoSwitchDayOnHabit] = enabled }
     }
 }
 

@@ -83,6 +83,7 @@ fun VildApp(vm: MainViewModel = viewModel()) {
     val syncStatus by vm.syncStatus.collectAsState()
     val activeMode by vm.activeMode.collectAsState()
     val adviceState by vm.adviceState.collectAsState()
+    val autoSwitchDayOnHabit by vm.autoSwitchDayOnHabit.collectAsState()
 
     var showSettings by remember { mutableStateOf(false) }
     var notesAdvice by remember { mutableStateOf<AdviceItem?>(null) }
@@ -90,6 +91,9 @@ fun VildApp(vm: MainViewModel = viewModel()) {
     if (showSettings) {
         SettingsScreen(
             adviceBySection = adviceState.adviceBySection,
+            isTailInstalled = vm.isTailInstalled,
+            autoSwitchDayOnHabit = autoSwitchDayOnHabit,
+            onAutoSwitchDayOnHabitChanged = { vm.setAutoSwitchDayOnHabit(it) },
             onAddAdvice = { section, text -> vm.addAdvice(section, text) },
             onUpdateAdvice = { item, text -> vm.updateAdvice(item, text) },
             onDeleteAdvice = { id -> vm.deleteAdvice(id) },

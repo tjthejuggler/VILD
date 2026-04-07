@@ -1,6 +1,7 @@
 package com.example.vild
 
 import android.app.Application
+import android.content.pm.PackageManager
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -81,6 +82,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _activeMode = MutableStateFlow("day")
     val activeMode: StateFlow<String> = _activeMode.asStateFlow()
 
+    // ── Tail integration state ────────────────────────────────────────────────
+
+    /** True if the Tail habit-tracker app is installed on this device. */
+    val isTailInstalled: Boolean = try {
+        application.packageManager.getPackageInfo("com.example.tail", 0)
+        true
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    }
+
+    private val _autoSwitchDayOnHabit = MutableStateFlow(false)
+    val autoSwitchDayOnHabit: StateFlow<Boolean> = _autoSwitchDayOnHabit.asStateFlow()
+
     // ── Advice state ──────────────────────────────────────────────────────────
 
     private val _adviceState = MutableStateFlow(AdviceUiState())
@@ -123,6 +137,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _activeMode.value = repo.activeModeFlow.first()
             _settings.value = repo.settingsFlow.first()
+            _autoSwitchDayOnHabit.value = repo.autoSwitchDayOnHabitFlow.first()
         }
         refreshNodes()
         // Observe advice for both sections
@@ -267,6 +282,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Randomize advice for the incoming mode
             randomizeAdvice(incoming)
         }
+    }
+
+    // ── Tail integration API ─────────────────────────────────────────────────
+
+    /** Persists the auto-switch-day-on-habit toggle. */
+    fun setAutoSwitchDayOnHabit(enabled: Boolean) {
+        _autoSwitchDayOnHabit.value = enabled
+        viewModelScope.launch { repo.setAutoSwitchDayOnHabit(enabled) }
     }
 
     // ── Preset API ───────────────────────────────────────────────────────────

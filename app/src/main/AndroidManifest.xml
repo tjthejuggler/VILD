@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+        Hold Tail's signature permission so we can receive its
+        ACTION_HABIT_INCREMENTED broadcast (auto day-mode switch feature).
+    -->
+    <uses-permission android:name="com.example.tail.permission.TAIL_INTEGRATION" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -22,6 +28,23 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            BroadcastReceiver: listens for Tail's ACTION_HABIT_INCREMENTED broadcast.
+            When the "auto switch to day mode" setting is enabled and VILD is currently
+            in night mode, this receiver switches to day mode and pushes settings to
+            the watch — even if VILD's UI is not open.
+            Protected by Tail's signature permission so only same-keystore apps can
+            trigger it.
+        -->
+        <receiver
+            android:name=".ipc.DayModeSwitchReceiver"
+            android:exported="true"
+            android:permission="com.example.tail.permission.TAIL_INTEGRATION">
+            <intent-filter>
+                <action android:name="com.example.tail.ACTION_HABIT_INCREMENTED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
