@@ -1,9 +1,13 @@
 package com.example.vild
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -64,9 +68,24 @@ import com.example.vild.ui.settings.SettingsScreen
 import com.example.vild.ui.theme.VILDTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* result ignored — best-effort */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Request POST_NOTIFICATIONS permission on Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
         setContent {
             VILDTheme {
                 VildApp()
@@ -84,6 +103,7 @@ fun VildApp(vm: MainViewModel = viewModel()) {
     val activeMode by vm.activeMode.collectAsState()
     val adviceState by vm.adviceState.collectAsState()
     val autoSwitchDayOnHabit by vm.autoSwitchDayOnHabit.collectAsState()
+    val triggers by vm.triggers.collectAsState()
 
     var showSettings by remember { mutableStateOf(false) }
     var notesAdvice by remember { mutableStateOf<AdviceItem?>(null) }
@@ -91,12 +111,16 @@ fun VildApp(vm: MainViewModel = viewModel()) {
     if (showSettings) {
         SettingsScreen(
             adviceBySection = adviceState.adviceBySection,
+            triggers = triggers,
             isTailInstalled = vm.isTailInstalled,
             autoSwitchDayOnHabit = autoSwitchDayOnHabit,
             onAutoSwitchDayOnHabitChanged = { vm.setAutoSwitchDayOnHabit(it) },
             onAddAdvice = { section, text -> vm.addAdvice(section, text) },
             onUpdateAdvice = { item, text -> vm.updateAdvice(item, text) },
             onDeleteAdvice = { id -> vm.deleteAdvice(id) },
+            onAddTrigger = { text -> vm.addTrigger(text) },
+            onUpdateTrigger = { item, text -> vm.updateTrigger(item, text) },
+            onDeleteTrigger = { id -> vm.deleteTrigger(id) },
             onBack = { showSettings = false },
         )
         return

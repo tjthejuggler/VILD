@@ -1,6 +1,6 @@
 # VILD – Progress
 
-> Last updated: 2026-04-01T09:04 UTC-6
+> Last updated: 2026-04-13T12:23 UTC-4
 
 ## Completed
 
@@ -23,10 +23,11 @@
 - [x] New features architecture plan created (`plans/new-features-plan.md`)
 - [x] Background redesign: solid black + parallax VILD icon (2026-04-01)
 - [x] Advice notes feature: tap any advice banner item to open a personal notes popup, persisted per advice item (2026-04-02)
+- [x] Daily reality check trigger notification: manage triggers in Settings, random one shown at 8 AM daily (2026-04-13)
 
 ## In Progress
 
-- Nothing currently in progress — awaiting implementation of planned features.
+- Nothing currently in progress.
 
 ## Not Yet Started — New Features
 

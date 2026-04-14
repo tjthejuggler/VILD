@@ -36,8 +36,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.vild.data.AdviceItem
+import com.example.vild.data.RealityCheckTrigger
 import com.example.vild.ui.advice.AdviceDialog
 import com.example.vild.ui.advice.AdviceSection
+import com.example.vild.ui.realitycheck.RealityCheckDialog
 import com.example.vild.ui.theme.Grey15
 import com.example.vild.ui.theme.Grey20
 import com.example.vild.ui.theme.Grey60
@@ -50,15 +52,20 @@ import com.example.vild.ui.theme.Grey60
 @Composable
 fun SettingsScreen(
     adviceBySection: Map<String, List<AdviceItem>>,
+    triggers: List<RealityCheckTrigger>,
     isTailInstalled: Boolean,
     autoSwitchDayOnHabit: Boolean,
     onAutoSwitchDayOnHabitChanged: (Boolean) -> Unit,
     onAddAdvice: (String, String) -> Unit,
     onUpdateAdvice: (AdviceItem, String) -> Unit,
     onDeleteAdvice: (Long) -> Unit,
+    onAddTrigger: (String) -> Unit,
+    onUpdateTrigger: (RealityCheckTrigger, String) -> Unit,
+    onDeleteTrigger: (Long) -> Unit,
     onBack: () -> Unit,
 ) {
     var openAdviceSection by remember { mutableStateOf<String?>(null) }
+    var openTriggers by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = Color.Black,
@@ -110,6 +117,14 @@ fun SettingsScreen(
                     onOpenSection = { openAdviceSection = it },
                 )
             }
+
+            // ── Reality Check Triggers ──────────────────────────────────────
+            item {
+                RealityCheckTriggersCard(
+                    triggerCount = triggers.size,
+                    onManage = { openTriggers = true },
+                )
+            }
         }
     }
 
@@ -122,6 +137,17 @@ fun SettingsScreen(
             onUpdate = { item, text -> onUpdateAdvice(item, text) },
             onDelete = { id -> onDeleteAdvice(id) },
             onDismiss = { openAdviceSection = null },
+        )
+    }
+
+    // ── Reality check triggers dialog ─────────────────────────────────────────
+    if (openTriggers) {
+        RealityCheckDialog(
+            triggers = triggers,
+            onAdd = onAddTrigger,
+            onUpdate = onUpdateTrigger,
+            onDelete = onDeleteTrigger,
+            onDismiss = { openTriggers = false },
         )
     }
 }
@@ -238,6 +264,68 @@ private fun TailIntegrationCard(
                         checkedTrackColor = Color(0xFF4CAF50),
                     ),
                 )
+            }
+        }
+    }
+}
+
+// ── Reality check triggers card ──────────────────────────────────────────────
+
+@Composable
+private fun RealityCheckTriggersCard(
+    triggerCount: Int,
+    onManage: () -> Unit,
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = Grey15)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                "Reality Check Triggers",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+            )
+            Text(
+                "Add triggers that will randomly appear as a daily morning notification at 8 AM. " +
+                    "One trigger is chosen each day to be your reality check reminder.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Grey60,
+            )
+
+            HorizontalDivider(color = Grey20)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Daily trigger",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                    )
+                    Text(
+                        if (triggerCount == 0) "No triggers set"
+                        else "$triggerCount trigger${if (triggerCount != 1) "s" else ""} configured",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (triggerCount > 0) Color(0xFF4CAF50) else Grey60,
+                    )
+                }
+                OutlinedButton(
+                    onClick = onManage,
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                ) {
+                    Text(
+                        if (triggerCount > 0) "Manage" else "Add",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
     }

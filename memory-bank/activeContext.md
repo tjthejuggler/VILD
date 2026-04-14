@@ -1,10 +1,10 @@
 # VILD – Active Context
 
-> Last updated: 2026-03-29T17:23 UTC-6
+> Last updated: 2026-04-13T12:23 UTC-4
 
 ## Current State
 
-The core architecture is implemented and functional. A **second wave of features** has been planned covering sync status, presets, day/night mode, snooze improvements, and a duration slider increase. See [`plans/new-features-plan.md`](../plans/new-features-plan.md) for the full implementation plan.
+The core architecture is implemented and functional. The **daily reality check trigger notification** feature has been added — users can manage a list of reality check triggers in Settings, and one is randomly chosen each morning at 8 AM and shown as a notification.
 
 ## What Was Recently Completed
 
@@ -12,6 +12,7 @@ The core architecture is implemented and functional. A **second wave of features
 - Watch-side Compose UI with "VILD is active" message and Test Vibration button.
 - Build fixes (Gradle plugin, Wear Compose BOM, coroutines dependency).
 - Architecture analysis and planning for the second wave of features.
+- **Daily reality check trigger notification** (2026-04-13).
 
 ## What's Next (Second Wave — Planned Features)
 
@@ -58,6 +59,23 @@ Five new features are planned — see [`plans/new-features-plan.md`](../plans/ne
 ## Known Issues
 
 - None currently tracked.
+
+---
+
+### 2026-04-13T12:23 UTC-4 — Daily reality check trigger notification
+
+- Created [`RealityCheckTrigger`](../app/src/main/java/com/example/vild/data/RealityCheckTrigger.kt) data class (same pattern as `AdviceItem`).
+- Created [`RealityCheckRepository`](../app/src/main/java/com/example/vild/data/RealityCheckRepository.kt) — DataStore JSON persistence with add/update/delete.
+- Created [`NotificationHelper`](../app/src/main/java/com/example/vild/data/NotificationHelper.kt) — notification channel creation + showing the daily trigger notification.
+- Created [`DailyTriggerScheduler`](../app/src/main/java/com/example/vild/data/DailyTriggerScheduler.kt) — AlarmManager `setAlarmClock()` at 8 AM daily.
+- Created [`DailyTriggerReceiver`](../app/src/main/java/com/example/vild/ipc/DailyTriggerReceiver.kt) — picks random trigger, shows notification, reschedules for next day.
+- Created [`BootReceiver`](../app/src/main/java/com/example/vild/ipc/BootReceiver.kt) — reschedules daily alarm after device reboot.
+- Created [`RealityCheckDialog`](../app/src/main/java/com/example/vild/ui/realitycheck/RealityCheckDialog.kt) — UI for managing triggers (same pattern as `AdviceDialog`).
+- Updated [`MainViewModel`](../app/src/main/java/com/example/vild/MainViewModel.kt) — added `triggerRepo`, `triggers` StateFlow, `addTrigger()`, `updateTrigger()`, `deleteTrigger()`, and scheduling on init.
+- Updated [`SettingsScreen`](../app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt) — added `RealityCheckTriggersCard` and wired trigger CRUD callbacks.
+- Updated [`MainActivity`](../app/src/main/java/com/example/vild/MainActivity.kt) — added POST_NOTIFICATIONS permission request (Android 13+), wired trigger state and callbacks to SettingsScreen.
+- Updated [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml) — added `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`/`USE_EXACT_ALARM` permissions; registered `DailyTriggerReceiver` and `BootReceiver`.
+- Build successful.
 
 ---
 

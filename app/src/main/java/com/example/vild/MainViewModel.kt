@@ -8,7 +8,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.vild.data.AdviceItem
 import com.example.vild.data.AdviceRepository
 import com.example.vild.data.AppSettingsRepository
+import com.example.vild.data.DailyTriggerScheduler
+import com.example.vild.data.NotificationHelper
 import com.example.vild.data.Preset
+import com.example.vild.data.RealityCheckRepository
+import com.example.vild.data.RealityCheckTrigger
 import com.example.vild.data.VibeSettings
 import com.example.vild.data.WearSyncManager
 import com.example.vild.shared.VibeConstants
@@ -66,6 +70,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repo = AppSettingsRepository(application)
     private val syncManager = WearSyncManager(application)
     private val adviceRepo = AdviceRepository(application)
+    private val triggerRepo = RealityCheckRepository(application)
 
     // ── UI state ─────────────────────────────────────────────────────────────
 
@@ -99,6 +104,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _adviceState = MutableStateFlow(AdviceUiState())
     val adviceState: StateFlow<AdviceUiState> = _adviceState.asStateFlow()
+
+    // ── Reality check trigger state ────────────────────────────────────────────
+
+    val triggers: StateFlow<List<RealityCheckTrigger>> = triggerRepo.allTriggersFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
 
     val presets: StateFlow<List<Preset>> = repo.presetsFlow
         .stateIn(
@@ -162,6 +176,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             delay(500)
             randomizeAdvice(_activeMode.value)
         }
+        // Ensure notification channel exists and schedule daily trigger alarm
+        NotificationHelper.ensureChannel(application)
+        DailyTriggerScheduler.schedule(application)
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -400,6 +417,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateAdviceNotes(id: Long, notes: String) {
         viewModelScope.launch { adviceRepo.updateNotes(id, notes) }
+    }
+
+    // ── Reality Check Trigger API ─────────────────────────────────────────────
+
+    fun addTrigger(text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch { triggerRepo.add(text.trim()) }
+    }
+
+    fun updateTrigger(item: RealityCheckTrigger, newText: String) {
+        if (newText.isBlank()) return
+        viewModelScope.launch { triggerRepo.update(item, newText.trim()) }
+    }
+
+    fun deleteTrigger(id: Long) {
+        viewModelScope.launch { triggerRepo.delete(id) }
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────

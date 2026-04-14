@@ -8,6 +8,17 @@
     -->
     <uses-permission android:name="com.example.tail.permission.TAIL_INTEGRATION" />
 
+    <!-- Notification permission (required on Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Required to reschedule alarms after device reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Required for exact alarm scheduling on Android 12+ -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -43,6 +54,29 @@
             android:permission="com.example.tail.permission.TAIL_INTEGRATION">
             <intent-filter>
                 <action android:name="com.example.tail.ACTION_HABIT_INCREMENTED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+            BroadcastReceiver: fires the daily reality check notification at 8 AM.
+            Also handles BOOT_COMPLETED to reschedule the alarm after reboot.
+        -->
+        <receiver
+            android:name=".ipc.DailyTriggerReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.vild.ACTION_DAILY_TRIGGER" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+            BroadcastReceiver: reschedules the daily trigger alarm after device reboot.
+        -->
+        <receiver
+            android:name=".ipc.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
     </application>
