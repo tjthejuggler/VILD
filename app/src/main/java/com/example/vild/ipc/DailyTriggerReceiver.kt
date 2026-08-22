@@ -5,8 +5,10 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.example.vild.data.DailyTriggerScheduler
+import com.example.vild.data.NagScheduler
 import com.example.vild.data.NotificationHelper
 import com.example.vild.data.RealityCheckRepository
+import com.example.vild.data.RealityCheckStatsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,8 +19,8 @@ private const val TAG = "DailyTriggerReceiver"
 
 /**
  * Fired at 8 AM each day by [DailyTriggerScheduler].
- * Picks a random reality check trigger from the user's list and shows a notification,
- * then reschedules the alarm for the next day.
+ * Chooses (or reuses) today's reality check log, shows the notification,
+ * arms the nag cycle, and reschedules the alarm for the next day.
  */
 class DailyTriggerReceiver : BroadcastReceiver() {
 
@@ -29,31 +31,31 @@ class DailyTriggerReceiver : BroadcastReceiver() {
             intent.action != Intent.ACTION_BOOT_COMPLETED
         ) return
 
-        Log.d(TAG, "Received alarm — picking random trigger")
+        Log.d(TAG, "Received alarm — preparing today's reality check")
 
         val pendingResult = goAsync()
         val appContext = context.applicationContext
 
         scope.launch {
             try {
-                val repo = RealityCheckRepository(appContext)
-                val triggers = repo.allTriggersFlow.first()
+                val triggerRepo = RealityCheckRepository(appContext)
+                val statsRepo = RealityCheckStatsRepository(appContext)
 
-                if (triggers.isEmpty()) {
-                    Log.d(TAG, "No triggers configured — skipping notification")
-                } else {
-                    val trigger = triggers.random()
-                    Log.d(TAG, "Selected trigger: ${trigger.text}")
-                    NotificationHelper.showNotification(appContext, trigger.text)
+                val triggers = triggerRepo.allTriggersFlow.first()
+                val todayLog = statsRepo.ensureTodayLog(triggers)
+
+                Log.d(TAG, "Today's reality check: ${todayLog.triggerText}")
+                NotificationHelper.showNotification(appContext, todayLog)
+
+                // Keep bothering until read AND done.
+                if (!todayLog.isComplete) {
+                    NagScheduler.schedule(appContext)
                 }
-
-                // Always reschedule for tomorrow
-                DailyTriggerScheduler.schedule(appContext)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to show daily trigger: ${e.message}", e)
-                // Still try to reschedule
-                DailyTriggerScheduler.schedule(appContext)
             } finally {
+                // Always reschedule for tomorrow.
+                DailyTriggerScheduler.schedule(appContext)
                 pendingResult.finish()
             }
         }

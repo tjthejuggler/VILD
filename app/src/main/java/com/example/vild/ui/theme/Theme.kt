@@ -3,53 +3,53 @@ package com.example.vild.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
 /**
- * Fully greyscale color scheme – every UI element is black/white/grey.
- * The background image is the only element that keeps its original colours
- * (handled at the composable level, not here).
+ * Dream color scheme — deep indigo nights, violet moonlight and aurora accents.
+ * Every screen floats over [DreamBackground], so surfaces stay dark and translucent.
  */
-private val GreyscaleColorScheme = darkColorScheme(
-    // Primary – used by filled Buttons (container = primary, text = onPrimary)
-    primary = Grey40,
-    onPrimary = White,
-    primaryContainer = Grey30,
-    onPrimaryContainer = White,
+private val DreamColorScheme = darkColorScheme(
+    // Primary — violet moonlight (filled buttons)
+    primary = Violet,
+    onPrimary = Void,
+    primaryContainer = Indigo,
+    onPrimaryContainer = MoonLavender,
 
-    // Secondary – used by Night-mode button
-    secondary = Grey30,
-    onSecondary = White,
-    secondaryContainer = Grey30,
-    onSecondaryContainer = White,
+    // Secondary — aurora teal (confirmations, night mode)
+    secondary = AuroraTeal,
+    onSecondary = Void,
+    secondaryContainer = Color(0xFF1E4A44),
+    onSecondaryContainer = AuroraTeal,
 
-    // Tertiary
-    tertiary = Grey30,
-    onTertiary = White,
-    tertiaryContainer = Grey30,
-    onTertiaryContainer = White,
+    // Tertiary — dream pink
+    tertiary = DreamPink,
+    onTertiary = Void,
+    tertiaryContainer = Color(0xFF4A2438),
+    onTertiaryContainer = DreamPink,
 
-    // Error (greyscale – no red)
-    error = Grey40,
-    onError = White,
-    errorContainer = Grey30,
-    onErrorContainer = White,
+    // Error — a soft ember rather than harsh red
+    error = Color(0xFFF0A6A6),
+    onError = Void,
+    errorContainer = Color(0xFF4A2424),
+    onErrorContainer = Color(0xFFF0A6A6),
 
     // Background & Surface
-    background = Grey10,
-    onBackground = White,
-    surface = Grey15,
-    onSurface = White,
-    surfaceVariant = Grey20,
-    onSurfaceVariant = White,
+    background = Void,
+    onBackground = MoonLavender,
+    surface = DeepIndigo,
+    onSurface = MoonLavender,
+    surfaceVariant = Indigo,
+    onSurfaceVariant = Mist,
 
     // Outline
-    outline = Grey60,
-    outlineVariant = Grey40,
+    outline = Color(0xFF5A4A8F),
+    outlineVariant = Color(0xFF33265C),
 
     // Inverse
-    inverseSurface = White,
-    inverseOnSurface = Black,
-    inversePrimary = Grey40,
+    inverseSurface = MoonLavender,
+    inverseOnSurface = Void,
+    inversePrimary = Indigo,
 
     // Scrim
     scrim = Black,
@@ -60,7 +60,7 @@ fun VILDTheme(
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
-        colorScheme = GreyscaleColorScheme,
+        colorScheme = DreamColorScheme,
         typography = Typography,
         content = content,
     )

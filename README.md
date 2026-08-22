@@ -1,8 +1,10 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-04-01T15:04 UTC
+> Last updated: 2026-08-22T08:30 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
+
+**The daily reality check is now the heart of the app:** every morning one of your triggers is chosen, shown immediately on the dream-like main screen, and the app *insists* — with an un-dismissable, self-re-posting notification — until you confirm you have both **read** and **done** the check. Streaks and stats are tracked in the Dream Stats screen. Watch vibration remains as a secondary reminder layer, configured on the Settings screen.
 
 ---
 
@@ -66,29 +68,68 @@ Phone companion app built with Jetpack Compose.
 | `data/AdviceRepository.kt` | DataStore-backed repository for CRUD operations on advice items (stored as JSON) |
 | `data/AppSettingsRepository.kt` | DataStore Preferences – persists settings locally on the phone; stores Day/Night mode snapshots as JSON |
 | `data/Preset.kt` | `@Serializable` data class capturing a named snapshot of vibration/scheduling settings |
+| `data/RealityCheckDayLog.kt` | `@Serializable` per-day record: chosen trigger, `readAt`, `doneAt` |
+| `data/RealityCheckStats.kt` | Pure stats computation — current/best read & done streaks, totals, per-trigger leaderboard |
+| `data/RealityCheckStatsRepository.kt` | DataStore-backed repository for day logs (`ensureTodayLog`, `markReadToday`, `markDoneToday`) |
+| `data/RealityCheckTrigger.kt` | `@Serializable` user-entered reality check trigger |
+| `data/RealityCheckRepository.kt` | DataStore-backed CRUD for triggers |
+| `data/TechniqueItem.kt` | `@Serializable` reality check technique (seeded classic or user-added) |
+| `data/TechniqueRepository.kt` | DataStore-backed CRUD for techniques + one-time seeding of 20 classic methods |
+| `data/DailyTriggerScheduler.kt` | Schedules the daily 8 AM alarm (`setAlarmClock`, Doze-exempt) |
+| `data/NagScheduler.kt` | Arms/disarms the 30-min self-rescheduling nag alarm |
+| `data/NotificationHelper.kt` | Builds the ongoing reality check notification with "✓ Read" / "✓ Done" actions |
 | `data/WearSyncManager.kt` | Wearable Data Layer client – pushes settings to all paired nodes |
-| `MainViewModel.kt` | AndroidViewModel – holds UI state, coordinates repo + sync; manages Day/Night mode switching and advice state |
-| `MainActivity.kt` | Compose UI entry point; shows settings screen overlay and advice banner |
+| `ipc/DailyTriggerReceiver.kt` | 8 AM receiver — ensures today's log, posts notification, arms nag |
+| `ipc/NagReceiver.kt` | Re-posts the notification every 30 min until the check is confirmed |
+| `ipc/RealityCheckActionReceiver.kt` | Handles notification action buttons (mark read / mark done) |
+| `ipc/BootReceiver.kt` | Re-arms alarms after reboot |
+| `MainViewModel.kt` | AndroidViewModel – UI state, day-log confirmations, streaks, watch sync, Day/Night mode, advice |
+| `MainActivity.kt` | Compose entry point — dream main screen (reality check first), stats & settings screens |
+| `ui/dream/AccelerometerEffect.kt` | `rememberTiltState()` — low-pass-filtered accelerometer tilt for parallax |
+| `ui/dream/DreamBackground.kt` | Living background: void gradient, drifting nebula orbs, twinkling parallax starfield, breathing glow |
+| `ui/dream/GlassCard.kt` | Translucent glass card with gradient border, used across all screens |
+| `ui/realitycheck/RealityCheckCard.kt` | The main card: today's trigger + "I read it" / "I did it" confirmations + streaks |
+| `ui/technique/TechniqueBanner.kt` | Swipeable glass banner showing a random reality check technique |
+| `ui/technique/TechniqueDialog.kt` | Manage techniques — add, edit, delete (✦ marks the classics) |
+| `ui/stats/StatsScreen.kt` | Dream Stats — streaks, totals, trigger leaderboard, 14-day timeline |
 | `ui/advice/AdviceSection.kt` | String constants for the two advice sections ("day" / "night") |
 | `ui/advice/AdviceBanner.kt` | Swipeable banner composable showing random advice; swipe left = next, swipe right = previous |
 | `ui/advice/AdviceDialog.kt` | Full-screen dialog for adding, editing, and deleting advice items |
-| `ui/settings/SettingsScreen.kt` | Settings screen with advice management cards for Day and Night sections |
+| `ui/settings/SettingsScreen.kt` | Secondary screen: vibration & watch tuning, presets, snooze, advice, triggers |
 | `ui/PresetSection.kt` | Preset save/load/delete UI component |
 
 #### UI Screens / Components
 
 | Component | Description |
 |-----------|-------------|
-| Background | Solid black with the VILD icon centered at 90% screen width; the icon scrolls at 30% of content speed (parallax effect) at 40% opacity |
-| Advice Banner | Swipeable banner at the top of the main screen showing random advice for the active mode (Day or Night); randomizes on app open and mode toggle |
-| Settings Screen | Gear icon in the top bar opens a full-screen settings overlay for managing advice |
-| Day/Night Toggle | Segmented ☼ Day / ☽ Night button pair at the top of the screen; each mode stores independent settings |
-| Master Toggle | Switch to enable/disable vibration reminders |
-| Node Selector | Dropdown listing connected Wear OS nodes; select the "active watch" or "All watches" |
-| Frequency Sliders | Min/max interval sliders (1–120 min); min is clamped ≤ max |
-| Intensity Slider | Vibration motor intensity 1–255 |
-| Snooze Buttons | 15 min / 30 min / 1 hr quick-snooze buttons |
-| Preset Section | Save current settings as a named preset; load or delete saved presets (applies to the currently active Day/Night mode) |
+| Dream Background | Deep void → indigo gradient with three drifting nebula orbs, a 70-star twinkling field and a breathing central glow — all subtly parallaxed by the accelerometer |
+| Reality Check Card | Today's trigger in large serif italic, with "I read it" / "I did it" pill buttons and live streaks; glows softly while unconfirmed |
+| Technique Banner | "REALITY CHECK IDEAS" section under the card — swipeable glass banner with a random technique for *how* to test reality (nose pinch, finger count, re-reading text…); seeded with 20 classic methods, user-editable |
+| Dream Stats | Streaks (current/best, read/done), totals with completion %, per-trigger leaderboard, last-14-nights dot timeline |
+| Advice Banner | Swipeable banner on the main screen showing random advice for the active mode (Day or Night) |
+| Settings Screen | Secondary screen for vibration & watch tuning, presets, snooze, advice and trigger management |
+| Day/Night Toggle | Glass pill ☀ Day / ☾ Night toggle; each mode stores independent settings |
+| Master Toggle | Switch to enable/disable vibration reminders (Settings screen) |
+| Node Selector | Dropdown listing connected Wear OS nodes; select the "active watch" or "All watches" (Settings screen) |
+| Frequency Sliders | Min/max interval sliders (1–120 min); min is clamped ≤ max (Settings screen) |
+| Intensity Slider | Vibration motor intensity 1–255 (Settings screen) |
+| Snooze Buttons | 15 min / 30 min / 1 hr quick-snooze buttons (Settings screen) |
+| Preset Section | Save current settings as a named preset; load or delete saved presets (Settings screen) |
+
+#### Reality check insistence loop
+
+```
+8 AM DailyTriggerReceiver ──► ensureTodayLog() ──► ongoing notification ──► arm NagScheduler
+                                                                        │
+              ┌─────────────────────────────────────────────────────────┘
+              ▼
+      NagReceiver (every 30 min)
+              │ incomplete? ──► re-post notification ──► re-arm
+              │ complete?   ──► cancel notification + disarm
+              ▼
+      User confirms via notification actions, or in-app
+      RealityCheckCard ("I read it" / "I did it")
+```
 
 #### Multi-watch support
 `WearSyncManager.pushSettings()` calls `DataClient.putDataItem()` which the Wearable Data Layer automatically delivers to **all** currently connected nodes and queues for nodes that are offline. When a disconnected watch reconnects, it receives the latest settings automatically.
@@ -143,6 +184,23 @@ VibeScheduler           VibeScheduler
 ---
 
 ## Changelog
+
+### 2026-08-22T08:30 UTC
+- **Reality check techniques (ideas banner):**
+  - **New:** [`TechniqueItem.kt`](app/src/main/java/com/example/vild/data/TechniqueItem.kt): `@Serializable` technique with `isSeeded` flag distinguishing classics from user-added ones.
+  - **New:** [`TechniqueRepository.kt`](app/src/main/java/com/example/vild/data/TechniqueRepository.kt): DataStore CRUD + `seedIfEmpty()` which inserts the 20 most popular reality check methods (finger counting, nose pinch, re-reading text, light switches, mirrors, palm push, jumping, dream math…) exactly once — guarded by a `has_seeded` flag so deleting classics doesn't resurrect them.
+  - **New:** [`TechniqueBanner.kt`](app/src/main/java/com/example/vild/ui/technique/TechniqueBanner.kt): dream-styled glass banner in its own "REALITY CHECK IDEAS" section on the main screen; swipe left → next random technique, right → previous; randomizes on app open.
+  - **New:** [`TechniqueDialog.kt`](app/src/main/java/com/example/vild/ui/technique/TechniqueDialog.kt): management dialog (add/edit/delete, ✦ marks classics), opened from a new "REALITY CHECK TECHNIQUES" card in Settings.
+  - [`MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt): `TechniqueUiState` (list + index + history), seeding & observation on init, `randomizeTechnique`/`nextRandomTechnique`/`previousTechnique`/`addTechnique`/`updateTechnique`/`deleteTechnique`.
+  - [`MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt): banner section between the reality check card and the advice whisper.
+
+### 2026-08-22T06:00 UTC
+- **Reality-check-first redesign + dream aesthetic:**
+  - **New daily practice core:** [`RealityCheckDayLog.kt`](app/src/main/java/com/example/vild/data/RealityCheckDayLog.kt) (per-day record with `readAt`/`doneAt`), [`RealityCheckStatsRepository.kt`](app/src/main/java/com/example/vild/data/RealityCheckStatsRepository.kt) (DataStore persistence, `ensureTodayLog`), [`RealityCheckStats.kt`](app/src/main/java/com/example/vild/data/RealityCheckStats.kt) (pure streak/leaderboard computation).
+  - **Insistence loop:** [`NagScheduler.kt`](app/src/main/java/com/example/vild/data/NagScheduler.kt) + [`NagReceiver.kt`](app/src/main/java/com/example/vild/ipc/NagReceiver.kt) re-post the notification every 30 minutes until the check is confirmed; [`RealityCheckActionReceiver.kt`](app/src/main/java/com/example/vild/ipc/RealityCheckActionReceiver.kt) handles "✓ Read"/"✓ Done" notification actions; [`NotificationHelper.kt`](app/src/main/java/com/example/vild/data/NotificationHelper.kt) now builds an **ongoing** (un-dismissable) notification with status-aware title. [`BootReceiver.kt`](app/src/main/java/com/example/vild/ipc/BootReceiver.kt) re-arms the nag after reboot.
+  - **Dream UI:** [`DreamBackground.kt`](app/src/main/java/com/example/vild/ui/dream/DreamBackground.kt) (accelerometer-parallaxed nebula orbs, twinkling starfield, breathing glow), [`AccelerometerEffect.kt`](app/src/main/java/com/example/vild/ui/dream/AccelerometerEffect.kt), [`GlassCard.kt`](app/src/main/java/com/example/vild/ui/dream/GlassCard.kt), new violet/aurora/serif theme in [`Color.kt`](app/src/main/java/com/example/vild/ui/theme/Color.kt)/[`Theme.kt`](app/src/main/java/com/example/vild/ui/theme/Theme.kt)/[`Type.kt`](app/src/main/java/com/example/vild/ui/theme/Type.kt).
+  - **Main screen:** [`RealityCheckCard.kt`](app/src/main/java/com/example/vild/ui/realitycheck/RealityCheckCard.kt) shows today's check immediately on open with read/done confirmations and streaks; vibration settings moved to [`SettingsScreen.kt`](app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt); new [`StatsScreen.kt`](app/src/main/java/com/example/vild/ui/stats/StatsScreen.kt) (streaks, totals, trigger leaderboard, 14-night timeline). Screens cross-fade; no top app bar.
+  - [`MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt): added `allLogs`/`todayLog`/`stats` flows, `markRead()`/`markDone()` with notification + nag management, and `ensureTodayLog` on init.
 
 ### 2026-03-31T17:45 UTC
 - **Settings screen & Advice feature** (adapted from wags project):

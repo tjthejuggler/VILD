@@ -9,12 +9,20 @@ import com.example.vild.data.AdviceItem
 import com.example.vild.data.AdviceRepository
 import com.example.vild.data.AppSettingsRepository
 import com.example.vild.data.DailyTriggerScheduler
+import com.example.vild.data.NagScheduler
 import com.example.vild.data.NotificationHelper
 import com.example.vild.data.Preset
+import com.example.vild.data.RealityCheckDayLog
 import com.example.vild.data.RealityCheckRepository
+import com.example.vild.data.RealityCheckStats
+import com.example.vild.data.RealityCheckStatsRepository
 import com.example.vild.data.RealityCheckTrigger
+import com.example.vild.data.TechniqueItem
+import com.example.vild.data.TechniqueRepository
 import com.example.vild.data.VibeSettings
 import com.example.vild.data.WearSyncManager
+import com.example.vild.data.computeStats
+import com.example.vild.data.todayEpochDay
 import com.example.vild.shared.VibeConstants
 import com.example.vild.ui.advice.AdviceSection
 import com.google.android.gms.wearable.Node
@@ -57,6 +65,19 @@ data class AdviceUiState(
 )
 
 /**
+ * UI state for the reality check techniques feature.
+ *
+ * @property techniques  All technique items (seeded classics + user-added).
+ * @property currentIndex Current random-index for the banner display.
+ * @property history      History of shown indices (for swipe-back).
+ */
+data class TechniqueUiState(
+    val techniques: List<TechniqueItem> = emptyList(),
+    val currentIndex: Int = 0,
+    val history: List<Int> = emptyList(),
+)
+
+/**
  * Holds all UI state for [MainActivity].
  *
  * On init it loads the last saved settings from [AppSettingsRepository] and
@@ -71,6 +92,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val syncManager = WearSyncManager(application)
     private val adviceRepo = AdviceRepository(application)
     private val triggerRepo = RealityCheckRepository(application)
+    private val statsRepo = RealityCheckStatsRepository(application)
+    private val techniqueRepo = TechniqueRepository(application)
 
     // ── UI state ─────────────────────────────────────────────────────────────
 
@@ -105,6 +128,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _adviceState = MutableStateFlow(AdviceUiState())
     val adviceState: StateFlow<AdviceUiState> = _adviceState.asStateFlow()
 
+    // ── Reality check techniques state ─────────────────────────────────────────
+
+    private val _techniqueState = MutableStateFlow(TechniqueUiState())
+    val techniqueState: StateFlow<TechniqueUiState> = _techniqueState.asStateFlow()
+
     // ── Reality check trigger state ────────────────────────────────────────────
 
     val triggers: StateFlow<List<RealityCheckTrigger>> = triggerRepo.allTriggersFlow
@@ -119,6 +147,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyList(),
+        )
+
+    // ── Reality check daily log & stats state ──────────────────────────────────
+
+    /** All day logs, oldest → newest. */
+    val allLogs: StateFlow<List<RealityCheckDayLog>> = statsRepo.allLogsFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
+
+    /** Today's log — the primary object on the main screen. */
+    val todayLog: StateFlow<RealityCheckDayLog?> = allLogs
+        .map { logs -> logs.firstOrNull { it.epochDay == todayEpochDay() } }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null,
+        )
+
+    /** Derived stats (streaks, totals, per-trigger leaderboard). */
+    val stats: StateFlow<RealityCheckStats> = allLogs
+        .map { computeStats(it) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = RealityCheckStats(),
         )
 
     /**
@@ -176,9 +232,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             delay(500)
             randomizeAdvice(_activeMode.value)
         }
+        // Seed the classic reality check techniques on first run, then observe
+        viewModelScope.launch {
+            techniqueRepo.seedIfEmpty()
+            techniqueRepo.allTechniquesFlow.collect { list ->
+                _techniqueState.update { old ->
+                    val idx = old.currentIndex
+                    val newIdx = if (list.isEmpty()) 0 else idx.coerceIn(0, list.size - 1)
+                    old.copy(techniques = list, currentIndex = newIdx)
+                }
+            }
+        }
+        // Show a random technique on app start
+        viewModelScope.launch {
+            delay(700)
+            randomizeTechnique()
+        }
         // Ensure notification channel exists and schedule daily trigger alarm
         NotificationHelper.ensureChannel(application)
         DailyTriggerScheduler.schedule(application)
+        // Make sure today's reality check exists the moment the app opens,
+        // and arm the nag cycle if it is still unconfirmed.
+        viewModelScope.launch {
+            runCatching {
+                val triggers = triggerRepo.allTriggersFlow.first()
+                val log = statsRepo.ensureTodayLog(triggers)
+                if (!log.isComplete) {
+                    NotificationHelper.showNotification(application, log)
+                    NagScheduler.schedule(application)
+                }
+            }
+        }
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -435,7 +519,75 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { triggerRepo.delete(id) }
     }
 
+    // ── Reality check techniques API ───────────────────────────────────────────
+
+    /** Picks a fresh random technique index. */
+    fun randomizeTechnique() {
+        _techniqueState.update { old ->
+            if (old.techniques.isEmpty()) return@update old
+            old.copy(currentIndex = (0 until old.techniques.size).random())
+        }
+    }
+
+    /** Swipe left → show next random technique (not the same as current). */
+    fun nextRandomTechnique() {
+        _techniqueState.update { old ->
+            val list = old.techniques
+            if (list.size <= 1) return@update old
+            val currentIdx = old.currentIndex
+            var newIdx: Int
+            do {
+                newIdx = (0 until list.size).random()
+            } while (newIdx == currentIdx)
+            old.copy(currentIndex = newIdx, history = old.history + currentIdx)
+        }
+    }
+
+    /** Swipe right → go back to the previously shown technique. */
+    fun previousTechnique() {
+        _techniqueState.update { old ->
+            if (old.history.isEmpty()) return@update old
+            val prevIdx = old.history.last()
+            old.copy(currentIndex = prevIdx, history = old.history.dropLast(1))
+        }
+    }
+
+    fun addTechnique(text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch { techniqueRepo.add(text.trim()) }
+    }
+
+    fun updateTechnique(item: TechniqueItem, newText: String) {
+        if (newText.isBlank()) return
+        viewModelScope.launch { techniqueRepo.update(item, newText.trim()) }
+    }
+
+    fun deleteTechnique(id: Long) {
+        viewModelScope.launch { techniqueRepo.delete(id) }
+    }
+
+    // ── Reality check daily confirmation API ───────────────────────────────────
+
+    /** Confirms the user has READ today's reality check. */
+    fun markRead() = markToday { repo -> repo.markReadToday() }
+
+    /** Confirms the user has DONE today's reality check. */
+    fun markDone() = markToday { repo -> repo.markDoneToday() }
+
     // ── Private helpers ──────────────────────────────────────────────────────
+
+    private fun markToday(action: suspend (RealityCheckStatsRepository) -> RealityCheckDayLog?) {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            val log = runCatching { action(statsRepo) }.getOrNull() ?: return@launch
+            if (log.isComplete) {
+                NotificationHelper.cancelNotification(app)
+                NagScheduler.cancel(app)
+            } else {
+                NotificationHelper.showNotification(app, log)
+            }
+        }
+    }
 
     private fun updateAndSync(newSettings: VibeSettings) {
         _settings.value = newSettings

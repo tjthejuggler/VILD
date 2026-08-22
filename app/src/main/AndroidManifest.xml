@@ -70,6 +70,22 @@
         </receiver>
 
         <!--
+            BroadcastReceiver: re-posts the reality check notification every
+            30 minutes until the user confirms they have read AND done it.
+        -->
+        <receiver
+            android:name=".ipc.NagReceiver"
+            android:exported="false" />
+
+        <!--
+            BroadcastReceiver: handles the "✓ Read" / "✓ Done" action buttons
+            on the reality check notification.
+        -->
+        <receiver
+            android:name=".ipc.RealityCheckActionReceiver"
+            android:exported="false" />
+
+        <!--
             BroadcastReceiver: reschedules the daily trigger alarm after device reboot.
         -->
         <receiver

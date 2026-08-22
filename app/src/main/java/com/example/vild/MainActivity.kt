@@ -8,7 +8,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,30 +22,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -50,22 +43,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.vild.shared.VibeConstants
-import com.example.vild.ui.PresetSection
-import com.example.vild.ui.SnoozeSection
-import com.example.vild.ui.VibrationSection
 import com.example.vild.data.AdviceItem
 import com.example.vild.ui.advice.AdviceBanner
 import com.example.vild.ui.advice.AdviceNotesDialog
+import com.example.vild.ui.dream.DreamBackground
+import com.example.vild.ui.dream.GlassCard
+import com.example.vild.ui.dream.rememberTiltState
+import com.example.vild.ui.realitycheck.RealityCheckCard
 import com.example.vild.ui.settings.SettingsScreen
+import com.example.vild.ui.stats.StatsScreen
+import com.example.vild.ui.technique.TechniqueBanner
+import com.example.vild.ui.theme.AuroraTeal
+import com.example.vild.ui.theme.Mist
+import com.example.vild.ui.theme.MoonLavender
+import com.example.vild.ui.theme.StarGold
 import com.example.vild.ui.theme.VILDTheme
+import com.example.vild.ui.theme.Void
+
+/** The three screens of the app, floating over the same dream sky. */
+private sealed interface Screen {
+    data object Main : Screen
+    data object Stats : Screen
+    data object Settings : Screen
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -94,91 +99,144 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VildApp(vm: MainViewModel = viewModel()) {
-    val settings by vm.settings.collectAsState()
-    val nodes by vm.nodes.collectAsState()
-    val syncStatus by vm.syncStatus.collectAsState()
-    val activeMode by vm.activeMode.collectAsState()
-    val adviceState by vm.adviceState.collectAsState()
-    val autoSwitchDayOnHabit by vm.autoSwitchDayOnHabit.collectAsState()
-    val triggers by vm.triggers.collectAsState()
+    var screen by remember { mutableStateOf<Screen>(Screen.Main) }
 
-    var showSettings by remember { mutableStateOf(false) }
-    var notesAdvice by remember { mutableStateOf<AdviceItem?>(null) }
-
-    if (showSettings) {
-        SettingsScreen(
-            adviceBySection = adviceState.adviceBySection,
-            triggers = triggers,
-            isTailInstalled = vm.isTailInstalled,
-            autoSwitchDayOnHabit = autoSwitchDayOnHabit,
-            onAutoSwitchDayOnHabitChanged = { vm.setAutoSwitchDayOnHabit(it) },
-            onAddAdvice = { section, text -> vm.addAdvice(section, text) },
-            onUpdateAdvice = { item, text -> vm.updateAdvice(item, text) },
-            onDeleteAdvice = { id -> vm.deleteAdvice(id) },
-            onAddTrigger = { text -> vm.addTrigger(text) },
-            onUpdateTrigger = { item, text -> vm.updateTrigger(item, text) },
-            onDeleteTrigger = { id -> vm.deleteTrigger(id) },
-            onBack = { showSettings = false },
-        )
-        return
-    }
-
-    // Shared scroll state for parallax effect.
-    val scrollState = rememberScrollState()
-
-    // Solid black background with parallax icon behind everything.
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        // Parallax background icon: moves at 30% of scroll speed.
-        val parallaxOffset = -(scrollState.value * 0.3f)
-        Image(
-            painter = painterResource(R.drawable.vild_icon),
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .align(Alignment.Center)
-                .offset { IntOffset(0, parallaxOffset.toInt()) }
-                .graphicsLayer(scaleX = 2.5f, scaleY = 2.5f),
-            contentScale = ContentScale.Fit,
-            alpha = 0.7f,
-        )
-
-        Scaffold(
-            containerColor = Color.Transparent,
-            contentColor = Color.White,
-            topBar = {
-                TopAppBar(
-                    title = { Text("VILD – Vibration Remote") },
-                    actions = {
-                        IconButton(onClick = { showSettings = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = Color.White,
-                            )
-                        }
-                    },
-                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        titleContentColor = Color.White,
-                    ),
+    AnimatedContent(
+        targetState = screen,
+        transitionSpec = {
+            // Dreams cross-fade into one another.
+            fadeIn(tween(600)) togetherWith fadeOut(tween(300))
+        },
+        label = "screen",
+    ) { current ->
+        when (current) {
+            Screen.Main -> MainScreen(
+                vm = vm,
+                onOpenStats = { screen = Screen.Stats },
+                onOpenSettings = { screen = Screen.Settings },
+            )
+            Screen.Stats -> {
+                val logs by vm.allLogs.collectAsState()
+                val stats by vm.stats.collectAsState()
+                StatsScreen(
+                    logs = logs,
+                    stats = stats,
+                    onBack = { screen = Screen.Main },
                 )
             }
-        ) { innerPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp)
-                    .verticalScroll(scrollState),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Screen.Settings -> SettingsScreen(
+                vm = vm,
+                onBack = { screen = Screen.Main },
+            )
+        }
+    }
+}
+
+// ── Main (dream) screen ───────────────────────────────────────────────────────
+
+/**
+ * The main screen: today's reality check floats front and center the moment
+ * the app opens, over a living accelerometer-parallaxed dream sky. Vibration
+ * settings live on the secondary settings screen.
+ */
+@Composable
+private fun MainScreen(
+    vm: MainViewModel,
+    onOpenStats: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    val todayLog by vm.todayLog.collectAsState()
+    val stats by vm.stats.collectAsState()
+    val activeMode by vm.activeMode.collectAsState()
+    val adviceState by vm.adviceState.collectAsState()
+    val techniqueState by vm.techniqueState.collectAsState()
+    val syncStatus by vm.syncStatus.collectAsState()
+
+    var notesAdvice by remember { mutableStateOf<AdviceItem?>(null) }
+
+    val tilt = rememberTiltState()
+    val scrollState = rememberScrollState()
+
+    Box(modifier = Modifier.fillMaxSize().background(Void)) {
+        DreamBackground(tilt = tilt)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Spacer(Modifier.height(8.dp))
+
+            // ── Header: title + portals to stats & settings ────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // ── Advice banner ─────────────────────────────────────────────
-                val currentSection = activeMode
-                val adviceList = adviceState.adviceBySection[currentSection] ?: emptyList()
-                val currentIndex = adviceState.currentIndex[currentSection] ?: 0
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "VILD",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MoonLavender,
+                    )
+                    Text(
+                        text = "lucid · aware · dreaming",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Mist,
+                    )
+                }
+                IconButton(onClick = onOpenStats) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "Dream stats",
+                        tint = StarGold,
+                    )
+                }
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = MoonLavender,
+                    )
+                }
+            }
+
+            // ── ★ Today's reality check — the heart of the app ─────────────────
+            RealityCheckCard(
+                log = todayLog,
+                readStreak = stats.currentReadStreak,
+                doneStreak = stats.currentDoneStreak,
+                onMarkRead = { vm.markRead() },
+                onMarkDone = { vm.markDone() },
+            )
+
+            // ── Reality check ideas — how to actually test it ──────────────────
+            if (techniqueState.techniques.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "REALITY CHECK IDEAS",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Mist,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+                    TechniqueBanner(
+                        techniques = techniqueState.techniques,
+                        currentIndex = techniqueState.currentIndex,
+                        onNext = { vm.nextRandomTechnique() },
+                        onPrevious = { vm.previousTechnique() },
+                    )
+                }
+            }
+
+            // ── Advice whisper ─────────────────────────────────────────────────
+            val currentSection = activeMode
+            val adviceList = adviceState.adviceBySection[currentSection] ?: emptyList()
+            val currentIndex = adviceState.currentIndex[currentSection] ?: 0
+            if (adviceList.isNotEmpty()) {
                 AdviceBanner(
                     section = currentSection,
                     adviceList = adviceList,
@@ -187,248 +245,115 @@ fun VildApp(vm: MainViewModel = viewModel()) {
                     onPrevious = { vm.previousAdvice(currentSection) },
                     onTap = { item -> notesAdvice = item },
                 )
+            }
 
-                notesAdvice?.let { item ->
-                    AdviceNotesDialog(
-                        advice = item,
-                        onSave = { notes -> vm.updateAdviceNotes(item.id, notes) },
-                        onDismiss = { notesAdvice = null },
-                    )
-                }
-
-                SyncStatusBar(syncStatus = syncStatus)
-
-                DayNightToggle(activeMode = activeMode, onToggle = { vm.toggleMode() })
-
-                // ── Master toggle ────────────────────────────────────────────
-                SectionLabel("Reminders")
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Enable vibration reminders", style = MaterialTheme.typography.bodyLarge)
-                    Switch(
-                        checked = settings.isEnabled,
-                        onCheckedChange = { vm.updateIsEnabled(it) },
-                    )
-                }
-
-                HorizontalDivider()
-
-                // ── Node selector ────────────────────────────────────────────
-                SectionLabel("Active Watch")
-                NodeSelector(
-                    nodes = nodes.map { it.id to it.displayName },
-                    selectedNodeId = settings.targetNodeId,
-                    onNodeSelected = { vm.updateTargetNode(it) },
-                    onRefresh = { vm.refreshNodes() },
+            notesAdvice?.let { item ->
+                AdviceNotesDialog(
+                    advice = item,
+                    onSave = { notes -> vm.updateAdviceNotes(item.id, notes) },
+                    onDismiss = { notesAdvice = null },
                 )
+            }
 
-                HorizontalDivider()
+            // ── Day / Night ────────────────────────────────────────────────────
+            DreamDayNightToggle(activeMode = activeMode, onToggle = { vm.toggleMode() })
 
-                // ── Frequency ────────────────────────────────────────────────
-                SectionLabel("Reminder Frequency")
+            // ── Sync status (subtle whisper) ───────────────────────────────────
+            if (syncStatus.lastSyncTimestamp != 0L) {
+                val secondsAgo =
+                    ((System.currentTimeMillis() - syncStatus.lastSyncTimestamp) / 1_000).toInt()
                 Text(
-                    "Min interval: ${settings.freqMinMinutes} min",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Slider(
-                    value = settings.freqMinMinutes.toFloat(),
-                    onValueChange = { vm.updateFreqMin(it.toInt()) },
-                    valueRange = 1f..120f,
-                    steps = 118,
+                    text = if (syncStatus.lastSyncSuccess) {
+                        "✧ watch synced ${secondsAgo}s ago"
+                    } else {
+                        "✧ watch sync failed"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (syncStatus.lastSyncSuccess) Mist else MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text(
-                    "Max interval: ${settings.freqMaxMinutes} min",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Slider(
-                    value = settings.freqMaxMinutes.toFloat(),
-                    onValueChange = { vm.updateFreqMax(it.toInt()) },
-                    valueRange = 1f..120f,
-                    steps = 118,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                HorizontalDivider()
-
-                // ── Vibration settings + Vibrate Now ─────────────────────────
-                SectionLabel("Vibration")
-                VibrationSection(settings = settings, vm = vm)
-
-                HorizontalDivider()
-
-                // ── Presets ──────────────────────────────────────────────────
-                SectionLabel("Presets")
-                PresetSection(vm = vm)
-
-                HorizontalDivider()
-
-                // ── Snooze ───────────────────────────────────────────────────
-                SectionLabel("Snooze")
-                SnoozeSection(settings = settings, vm = vm)
-
-                Spacer(Modifier.height(16.dp))
             }
-        }
-    }
-}
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+            Spacer(Modifier.height(16.dp))
 
-/**
- * A two-button segmented toggle for switching between Day and Night modes.
- * The active mode button is filled; the inactive one is outlined.
- * Uses plain-text symbols (not colour emojis) to stay greyscale.
- */
-@Composable
-private fun DayNightToggle(activeMode: String, onToggle: () -> Unit) {
-    val isDay = activeMode == "day"
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (isDay) {
-            Button(
-                onClick = {},
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("☼  Day")
-            }
-            OutlinedButton(
-                onClick = onToggle,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("☽  Night")
-            }
-        } else {
-            OutlinedButton(
-                onClick = onToggle,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("☼  Day")
-            }
-            Button(
-                onClick = {},
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                ),
-            ) {
-                Text("☽  Night")
-            }
-        }
-    }
-}
-
-
-/**
- * A slim banner shown at the top of the content area indicating the last sync result.
- *
- * - Never synced: hidden (no banner shown).
- * - Last sync succeeded: green tint + "✓ Synced X sec ago".
- * - Last sync failed: error tint + "✗ Sync failed".
- */
-@Composable
-private fun SyncStatusBar(syncStatus: SyncStatus) {
-    if (syncStatus.lastSyncTimestamp == 0L) return
-
-    val secondsAgo = ((System.currentTimeMillis() - syncStatus.lastSyncTimestamp) / 1_000).toInt()
-    val label = if (syncStatus.lastSyncSuccess) {
-        "✓ Synced ${secondsAgo}s ago"
-    } else {
-        "✗ Sync failed"
-    }
-    val containerColor = if (syncStatus.lastSyncSuccess) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.errorContainer
-    }
-    val contentColor = if (syncStatus.lastSyncSuccess) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onErrorContainer
-    }
-
-    Surface(
-        color = containerColor,
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-        )
-    }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 8.dp),
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun NodeSelector(
-    nodes: List<Pair<String, String>>,
-    selectedNodeId: String,
-    onNodeSelected: (String) -> Unit,
-    onRefresh: () -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    val allOption = VibeConstants.VALUE_TARGET_NODE_ALL to "All watches"
-    val options = listOf(allOption) + nodes
-
-    val selectedLabel = options.firstOrNull { it.first == selectedNodeId }?.second
-        ?: "All watches"
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded },
-            modifier = Modifier.weight(1f),
-        ) {
-            OutlinedTextField(
-                value = selectedLabel,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Active watch") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier
-                    .menuAnchor()
-                    .fillMaxWidth(),
+            // ── Footer ─────────────────────────────────────────────────────────
+            Text(
+                text = "sleep deep · dream aware",
+                style = MaterialTheme.typography.labelSmall,
+                color = Mist.copy(alpha = 0.5f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-            ) {
-                options.forEach { (id, name) ->
-                    DropdownMenuItem(
-                        text = { Text(name) },
-                        onClick = {
-                            onNodeSelected(id)
-                            expanded = false
-                        },
-                    )
-                }
-            }
+            Spacer(Modifier.height(24.dp))
         }
-        Button(onClick = onRefresh) {
-            Text("Refresh")
+    }
+}
+
+/**
+ * Dream-styled Day/Night toggle: a glass pill with a sliding celestial body.
+ * Sun ☀ for day, moon ☾ for night.
+ */
+@Composable
+private fun DreamDayNightToggle(activeMode: String, onToggle: () -> Unit) {
+    val isDay = activeMode == "day"
+
+    GlassCard(cornerRadius = 50.dp, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            ToggleHalf(
+                label = "☀  Day",
+                active = isDay,
+                activeColor = StarGold,
+                onClick = { if (!isDay) onToggle() },
+                modifier = Modifier.weight(1f),
+            )
+            ToggleHalf(
+                label = "☾  Night",
+                active = !isDay,
+                activeColor = AuroraTeal,
+                onClick = { if (isDay) onToggle() },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToggleHalf(
+    label: String,
+    active: Boolean,
+    activeColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val container = if (active) {
+        Brush.linearGradient(listOf(activeColor.copy(alpha = 0.28f), activeColor.copy(alpha = 0.10f)))
+    } else {
+        Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+    }
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = Color.Transparent,
+        modifier = modifier,
+    ) {
+        Box(
+            modifier = Modifier
+                .background(container, RoundedCornerShape(50))
+                .padding(vertical = 10.dp)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (active) activeColor else Mist,
+            )
         }
     }
 }
