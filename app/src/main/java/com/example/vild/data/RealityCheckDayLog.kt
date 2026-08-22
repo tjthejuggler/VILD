@@ -25,6 +25,12 @@ data class RealityCheckDayLog(
     val readAt: Long? = null,
     /** When the user confirmed they actually did the check; null until then. */
     val doneAt: Long? = null,
+    /**
+     * How many times the user tapped "I did it" — the button is deliberately
+     * repeatable so extra rounds can be logged in the Tail app; the first
+     * tap is what sets [doneAt] and completes the day.
+     */
+    val doneCount: Int = 0,
 ) {
     /** True once the user has confirmed both reading and doing the check. */
     val isComplete: Boolean get() = readAt != null && doneAt != null

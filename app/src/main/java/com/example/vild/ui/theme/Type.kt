@@ -13,20 +13,21 @@ import androidx.compose.ui.unit.sp
  * starlight; italics mark the whisper of the subconscious.
  */
 val Typography = Typography(
-    // The reality check prompt itself — big, serif, italic whisper.
+    // The reality check prompt itself — a serif, italic whisper.
+    // Kept compact so the whole main screen fits without scrolling.
     displayLarge = TextStyle(
         fontFamily = FontFamily.Serif,
         fontStyle = FontStyle.Italic,
         fontWeight = FontWeight.Light,
-        fontSize = 30.sp,
-        lineHeight = 40.sp,
+        fontSize = 20.sp,
+        lineHeight = 27.sp,
         letterSpacing = 0.5.sp,
     ),
     displayMedium = TextStyle(
         fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.Light,
-        fontSize = 24.sp,
-        lineHeight = 32.sp,
+        fontSize = 19.sp,
+        lineHeight = 26.sp,
         letterSpacing = 0.5.sp,
     ),
     // Screen titles ("VILD", "Dream Stats", "Settings")

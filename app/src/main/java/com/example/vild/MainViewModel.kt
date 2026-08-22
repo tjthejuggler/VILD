@@ -17,6 +17,8 @@ import com.example.vild.data.RealityCheckRepository
 import com.example.vild.data.RealityCheckStats
 import com.example.vild.data.RealityCheckStatsRepository
 import com.example.vild.data.RealityCheckTrigger
+import com.example.vild.data.TailHabit
+import com.example.vild.data.TailIntegrationRepository
 import com.example.vild.data.TechniqueItem
 import com.example.vild.data.TechniqueRepository
 import com.example.vild.data.VibeSettings
@@ -78,6 +80,29 @@ data class TechniqueUiState(
 )
 
 /**
+ * UI state for the Tail habit-tracker integration.
+ *
+ * @property habits      Habits exposed by Tail's Content Provider.
+ * @property loading     True while a habit fetch is in flight.
+ * @property unavailable True when Tail is not installed / exposes no habits.
+ * @property readHabit   Selected Tail habit name for the "read" event ("" = none).
+ * @property doneHabit   Selected Tail habit name for the "done" event ("" = none).
+ * @property backfilling True while the retroactive backfill broadcast is queued.
+ * @property message     Last success message (dismissable).
+ * @property error       Last error message (dismissable).
+ */
+data class TailUiState(
+    val habits: List<TailHabit> = emptyList(),
+    val loading: Boolean = false,
+    val unavailable: Boolean = false,
+    val readHabit: String = "",
+    val doneHabit: String = "",
+    val backfilling: Boolean = false,
+    val message: String? = null,
+    val error: String? = null,
+)
+
+/**
  * Holds all UI state for [MainActivity].
  *
  * On init it loads the last saved settings from [AppSettingsRepository] and
@@ -94,6 +119,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val triggerRepo = RealityCheckRepository(application)
     private val statsRepo = RealityCheckStatsRepository(application)
     private val techniqueRepo = TechniqueRepository(application)
+    private val tailRepo = TailIntegrationRepository(application)
 
     // ── UI state ─────────────────────────────────────────────────────────────
 
@@ -122,6 +148,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _autoSwitchDayOnHabit = MutableStateFlow(false)
     val autoSwitchDayOnHabit: StateFlow<Boolean> = _autoSwitchDayOnHabit.asStateFlow()
+
+    private val _tailState = MutableStateFlow(
+        TailUiState(
+            readHabit = tailRepo.getHabitName(TailIntegrationRepository.Slot.READ),
+            doneHabit = tailRepo.getHabitName(TailIntegrationRepository.Slot.DONE),
+        ),
+    )
+    val tailState: StateFlow<TailUiState> = _tailState.asStateFlow()
 
     // ── Advice state ──────────────────────────────────────────────────────────
 
@@ -568,11 +602,117 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Reality check daily confirmation API ───────────────────────────────────
 
-    /** Confirms the user has READ today's reality check. */
-    fun markRead() = markToday { repo -> repo.markReadToday() }
+    /**
+     * Confirms the user has READ today's reality check — once. The first
+     * confirmation also increments the Tail habit mapped to READ.
+     */
+    fun markRead() = markToday { repo ->
+        repo.markReadToday()?.also {
+            tailRepo.sendHabitIncrement(TailIntegrationRepository.Slot.READ)
+        }
+    }
 
-    /** Confirms the user has DONE today's reality check. */
-    fun markDone() = markToday { repo -> repo.markDoneToday() }
+    /**
+     * Records one more "I did it" round — deliberately repeatable. Every
+     * single tap increments the Tail habit mapped to DONE; the first tap is
+     * what completes the day (and stops the nagging).
+     */
+    fun markDone() = markToday { repo ->
+        repo.markDoneToday()?.also {
+            tailRepo.sendHabitIncrement(TailIntegrationRepository.Slot.DONE)
+        }
+    }
+
+    // ── Tail habit-tracker integration API ─────────────────────────────────────
+
+    /** Fetches the habit list from Tail's Content Provider. */
+    fun refreshTailHabits() {
+        _tailState.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            val habits = tailRepo.fetchHabits()
+            _tailState.update {
+                it.copy(
+                    habits = habits,
+                    loading = false,
+                    unavailable = habits.isEmpty(),
+                )
+            }
+        }
+    }
+
+    /** Persists the chosen habit for [slot] and backfills its history to Tail. */
+    fun selectTailHabit(slot: TailIntegrationRepository.Slot, habit: TailHabit) {
+        tailRepo.setHabit(slot, habit.habitName)
+        _tailState.update {
+            when (slot) {
+                TailIntegrationRepository.Slot.READ -> it.copy(readHabit = habit.habitName)
+                TailIntegrationRepository.Slot.DONE -> it.copy(doneHabit = habit.habitName)
+            }
+        }
+        // Connecting a new habit backfills its history automatically (wags pattern).
+        backfillTail()
+    }
+
+    /** Clears the habit selection for [slot]. */
+    fun clearTailHabit(slot: TailIntegrationRepository.Slot) {
+        tailRepo.clearHabit(slot)
+        _tailState.update {
+            when (slot) {
+                TailIntegrationRepository.Slot.READ -> it.copy(readHabit = "")
+                TailIntegrationRepository.Slot.DONE -> it.copy(doneHabit = "")
+            }
+        }
+    }
+
+    /**
+     * Sends every logged day's read/done values to Tail with SET semantics —
+     * fully authoritative and idempotent. Read days send 1 (0 when the check
+     * was never read); done days send the done-round count (0 when never
+     * done). Tail treats 0 as "clear this date", so a point that was pushed
+     * to the wrong habit (e.g. while a slot was briefly mis-mapped) is wiped
+     * on the next backfill. Days VILD has no log for are left untouched.
+     */
+    fun backfillTail() {
+        _tailState.update { it.copy(backfilling = true, message = null, error = null) }
+        viewModelScope.launch {
+            try {
+                val logs = allLogs.value
+                if (logs.isNotEmpty()) {
+                    tailRepo.sendHabitValuesForDates(
+                        TailIntegrationRepository.Slot.READ,
+                        logs.associate {
+                            dateKey(it.epochDay) to if (it.readAt != null) 1 else 0
+                        },
+                    )
+                    tailRepo.sendHabitValuesForDates(
+                        TailIntegrationRepository.Slot.DONE,
+                        logs.associate {
+                            // Legacy logs predate doneCount: doneAt set, count 0 → count as 1.
+                            dateKey(it.epochDay) to
+                                if (it.doneAt != null) maxOf(1, it.doneCount) else 0
+                        },
+                    )
+                }
+                _tailState.update {
+                    it.copy(
+                        backfilling = false,
+                        message = "Backfill sent — ${logs.size} day(s) synced to Tail " +
+                            "(not-done days cleared).",
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "backfillTail failed: ${e.message}")
+                _tailState.update {
+                    it.copy(backfilling = false, error = "Backfill failed — is Tail installed?")
+                }
+            }
+        }
+    }
+
+    /** Dismisses the backfill message/error. */
+    fun dismissTailMessage() {
+        _tailState.update { it.copy(message = null, error = null) }
+    }
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
@@ -580,14 +720,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val app = getApplication<Application>()
         viewModelScope.launch {
             val log = runCatching { action(statsRepo) }.getOrNull() ?: return@launch
+            // The notification stays all day (with "I did it" always available for
+            // extra Tail rounds) — but the nagging stops once the day is complete.
+            NotificationHelper.showNotification(app, log)
             if (log.isComplete) {
-                NotificationHelper.cancelNotification(app)
                 NagScheduler.cancel(app)
-            } else {
-                NotificationHelper.showNotification(app, log)
             }
         }
     }
+
+    /** Converts an epoch day to the ISO-8601 date string Tail expects. */
+    private fun dateKey(epochDay: Long): String =
+        java.time.LocalDate.ofEpochDay(epochDay).toString()
 
     private fun updateAndSync(newSettings: VibeSettings) {
         _settings.value = newSettings

@@ -8,12 +8,16 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -71,12 +75,16 @@ fun RealityCheckCard(
     )
 
     GlassCard(modifier = modifier.fillMaxWidth()) {
+        // The card drinks up all the space it is given, and the content fills
+        // it edge to edge: header on top, controls at the bottom, and every
+        // pixel between belongs to the trigger text so it fits without
+        // scrolling (the scroll is only a last-resort backup).
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+                .fillMaxSize()
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // ── Header ─────────────────────────────────────────────────────────
             Text(
@@ -89,13 +97,23 @@ fun RealityCheckCard(
             )
 
             // ── The trigger itself — a whispered question ──────────────────────
-            Text(
-                text = log?.triggerText ?: "…",
-                style = MaterialTheme.typography.displayLarge,
-                color = MoonLavender,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
+            // This region expands into all the card's free space; the text is
+            // centered in it and only scrolls if it truly cannot fit.
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = log?.triggerText ?: "…",
+                    style = MaterialTheme.typography.displayLarge,
+                    color = MoonLavender,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
 
             // ── Status line ────────────────────────────────────────────────────
             Text(
@@ -125,9 +143,16 @@ fun RealityCheckCard(
                     modifier = Modifier.weight(1f),
                 )
                 ConfirmButton(
-                    label = if (done) "✓ Done ${formatTime(log?.doneAt)}" else "I did it",
+                    label = when {
+                        done && (log?.doneCount ?: 0) > 1 ->
+                            "✓ Done ×${log?.doneCount} — again?"
+                        done -> "✓ Done ${formatTime(log?.doneAt)} — again?"
+                        else -> "I did it"
+                    },
                     confirmed = done,
-                    enabled = !done && log != null,
+                    // Deliberately repeatable: every tap logs another done round
+                    // in the Tail app. Only "read" is locked after first press.
+                    enabled = log != null,
                     onClick = onMarkDone,
                     modifier = Modifier.weight(1f),
                 )

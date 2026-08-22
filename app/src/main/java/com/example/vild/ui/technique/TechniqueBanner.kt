@@ -6,14 +6,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -33,13 +36,14 @@ import androidx.compose.ui.unit.sp
 import com.example.vild.data.TechniqueItem
 import com.example.vild.ui.dream.GlassCard
 import com.example.vild.ui.theme.AuroraTeal
-import com.example.vild.ui.theme.Mist
 import com.example.vild.ui.theme.MoonLavender
 
 /**
  * A glass banner showing a random reality check technique — an idea for
- * *how* to test whether you're dreaming.
- * Swipe left → next random technique, swipe right → previous.
+ * *how* to test whether you're dreaming. The ✧ glyph and aurora accents
+ * are its voice; the advice banner is its rose-tinted sibling.
+ *
+ * Arrows step through techniques (‹ previous · next ›); swiping works too.
  * Up to 5 visible lines; longer text scrolls silently.
  */
 @Composable
@@ -73,11 +77,9 @@ fun TechniqueBanner(
         ) { (_, text) ->
             var dragTotal by remember { mutableFloatStateOf(0f) }
 
-            @OptIn(ExperimentalFoundationApi::class)
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 130.dp)
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures(
                             onDragEnd = {
@@ -97,40 +99,74 @@ fun TechniqueBanner(
                             dragTotal += dragAmount
                         }
                     }
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .padding(horizontal = 6.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "✧  technique  ✧",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AuroraTeal.copy(alpha = 0.8f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
+                ArrowGlyph(
+                    glyph = "‹",
+                    tint = AuroraTeal,
+                    onClick = {
+                        swipeDirection = -1
+                        onPrevious()
+                    },
                 )
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 13.sp,
-                        fontStyle = FontStyle.Italic,
-                        lineHeight = 18.sp,
-                    ),
-                    color = MoonLavender,
-                    textAlign = TextAlign.Center,
+
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                )
-                Text(
-                    text = "‹ swipe ›",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Mist.copy(alpha = 0.4f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
+                        .weight(1f)
+                        .heightIn(max = 110.dp)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "✧  reality check idea  ✧",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AuroraTeal.copy(alpha = 0.8f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 13.sp,
+                            fontStyle = FontStyle.Italic,
+                            lineHeight = 18.sp,
+                        ),
+                        color = MoonLavender,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                    )
+                }
+
+                ArrowGlyph(
+                    glyph = "›",
+                    tint = AuroraTeal,
+                    onClick = {
+                        swipeDirection = 1
+                        onNext()
+                    },
                 )
             }
         }
     }
+}
+
+/** A soft tappable arrow — ‹ goes back, › goes forward. */
+@Composable
+private fun ArrowGlyph(
+    glyph: String,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = glyph,
+        style = MaterialTheme.typography.titleLarge,
+        color = tint.copy(alpha = 0.55f),
+        modifier = Modifier
+            .clip(CircleShape)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    )
 }

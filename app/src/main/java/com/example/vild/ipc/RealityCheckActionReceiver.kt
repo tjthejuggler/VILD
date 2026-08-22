@@ -7,6 +7,7 @@ import android.util.Log
 import com.example.vild.data.NagScheduler
 import com.example.vild.data.NotificationHelper
 import com.example.vild.data.RealityCheckStatsRepository
+import com.example.vild.data.TailIntegrationRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,8 +17,12 @@ private const val TAG = "RealityCheckActionReceiver"
 
 /**
  * Handles the action buttons on the reality check notification:
- * "✓ Read" and "✓ Done". Updates today's day log, refreshes or clears the
- * notification, and stops the nag cycle once the check is fully confirmed.
+ * "✓ Read" (once) and "✓ Done" (repeatable — every tap logs another round).
+ *
+ * Each successful action also increments the matching habit in the Tail app.
+ * The notification itself is never cancelled: it lives all day as the home
+ * of the repeatable "I did it" action; only the nagging stops once the day
+ * is complete.
  */
 class RealityCheckActionReceiver : BroadcastReceiver() {
 
@@ -40,17 +45,31 @@ class RealityCheckActionReceiver : BroadcastReceiver() {
         scope.launch {
             try {
                 val repo = RealityCheckStatsRepository(appContext)
-                val log = if (action == ACTION_MARK_READ) repo.markReadToday() else repo.markDoneToday()
+                val tail = TailIntegrationRepository(appContext)
+                val log = if (action == ACTION_MARK_READ) {
+                    // markReadToday() returns null when already read — the Tail
+                    // increment is only sent on the first confirmation.
+                    repo.markReadToday()?.also {
+                        tail.sendHabitIncrement(TailIntegrationRepository.Slot.READ)
+                    }
+                } else {
+                    // Repeatable by design: every tap bumps doneCount and sends
+                    // another increment to Tail.
+                    repo.markDoneToday()?.also {
+                        tail.sendHabitIncrement(TailIntegrationRepository.Slot.DONE)
+                    }
+                }
 
                 if (log == null) {
-                    Log.w(TAG, "No log for today — nothing to mark")
-                } else if (log.isComplete) {
-                    Log.d(TAG, "Check complete — clearing notification, disarming nag")
-                    NotificationHelper.cancelNotification(appContext)
-                    NagScheduler.cancel(appContext)
+                    Log.d(TAG, "Nothing to mark (already read, or no log yet)")
                 } else {
-                    // Still half-done: refresh the notification to reflect new state.
+                    // Refresh the notification (it stays all day) and stop the
+                    // nagging once the day is complete.
                     NotificationHelper.showNotification(appContext, log)
+                    if (log.isComplete) {
+                        Log.d(TAG, "Check complete — disarming nag (notification stays)")
+                        NagScheduler.cancel(appContext)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to mark: ${e.message}", e)

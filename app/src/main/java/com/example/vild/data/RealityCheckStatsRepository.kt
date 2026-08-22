@@ -55,11 +55,31 @@ class RealityCheckStatsRepository(private val context: Context) {
         return loadAll(context.dayLogDataStore.data.first()).first { it.epochDay == today }
     }
 
-    /** Sets [RealityCheckDayLog.readAt] for today, if not already set. Returns today's log. */
-    suspend fun markReadToday(): RealityCheckDayLog? = updateToday { it.copy(readAt = System.currentTimeMillis()) }
+    /**
+     * Sets [RealityCheckDayLog.readAt] for today — once. Returns null when the
+     * check was already marked read (so callers can deduplicate side effects
+     * like Tail habit increments).
+     */
+    suspend fun markReadToday(): RealityCheckDayLog? {
+        val alreadyRead = loadAll(context.dayLogDataStore.data.first())
+            .firstOrNull { it.epochDay == todayEpochDay() }
+            ?.readAt != null
+        if (alreadyRead) return null
+        return updateToday { it.copy(readAt = System.currentTimeMillis()) }
+    }
 
-    /** Sets [RealityCheckDayLog.doneAt] for today, if not already set. Returns today's log. */
-    suspend fun markDoneToday(): RealityCheckDayLog? = updateToday { it.copy(doneAt = System.currentTimeMillis()) }
+    /**
+     * Records one more "I did it" round for today. The button is repeatable:
+     * the first call sets [RealityCheckDayLog.doneAt] (completing the day) and
+     * every call — including later ones — bumps [RealityCheckDayLog.doneCount].
+     */
+    suspend fun markDoneToday(): RealityCheckDayLog? = updateToday {
+        val now = System.currentTimeMillis()
+        it.copy(
+            doneAt = it.doneAt ?: now,
+            doneCount = it.doneCount + 1,
+        )
+    }
 
     private suspend fun updateToday(transform: (RealityCheckDayLog) -> RealityCheckDayLog): RealityCheckDayLog? {
         val today = todayEpochDay()

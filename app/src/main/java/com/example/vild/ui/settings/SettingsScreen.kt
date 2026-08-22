@@ -73,6 +73,7 @@ fun SettingsScreen(
     val triggers by vm.triggers.collectAsState()
     val techniqueState by vm.techniqueState.collectAsState()
     val autoSwitchDayOnHabit by vm.autoSwitchDayOnHabit.collectAsState()
+    val tailState by vm.tailState.collectAsState()
 
     var openAdviceSection by remember { mutableStateOf<String?>(null) }
     var openTriggers by remember { mutableStateOf(false) }
@@ -226,6 +227,27 @@ fun SettingsScreen(
                     ) {
                         Text("SNOOZE", style = MaterialTheme.typography.labelMedium, color = Mist)
                         SnoozeSection(settings = settings, vm = vm)
+                    }
+                }
+            }
+
+            // ── Tail habits (read/done → Tail app) ─────────────────────────────
+            item {
+                GlassCard {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        TailAppSection(
+                            state = tailState,
+                            onSelectHabit = { slot, habit -> vm.selectTailHabit(slot, habit) },
+                            onClearHabit = { slot -> vm.clearTailHabit(slot) },
+                            onRefresh = { vm.refreshTailHabits() },
+                            onBackfill = { vm.backfillTail() },
+                            onDismissMessage = { vm.dismissTailMessage() },
+                        )
                     }
                 }
             }

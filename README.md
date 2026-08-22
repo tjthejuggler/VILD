@@ -185,6 +185,35 @@ VibeScheduler           VibeScheduler
 
 ## Changelog
 
+### 2026-08-22T10:25 UTC
+- **Tail backfill bug fix — phantom "done" point:** logcat showed that during setup the READ slot was briefly mapped to the *Done* habit; its auto-backfill wrote today's read point into "Reality Check Done", and nothing ever cleared it (backfill only ever sent positive values).
+  - [`MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt): `backfillTail()` is now **fully authoritative** — for every day VILD has a log it sends the true read value (1/0) and done-round count (`maxOf(1, doneCount)`/0). Tail treats 0 as "clear this date", so wrong points self-heal on the next Send. Also fixes legacy logs (`doneAt` set before `doneCount` existed) being silently excluded from the done backfill. Days without a VILD log are untouched.
+  - [`TailSection.kt`](app/src/main/java/com/example/vild/ui/settings/TailSection.kt): habit picker hardened — the dialog title now names the slot ("Read"/"Done") with a one-line description of when it fires, and a habit already mapped to the other slot is disabled with a hint, so both slots can never point at the same habit.
+
+### 2026-08-22T10:10 UTC
+- [`RealityCheckCard.kt`](app/src/main/java/com/example/vild/ui/realitycheck/RealityCheckCard.kt): the card's content now fills it edge to edge — header on top, buttons/streaks at the bottom, and the trigger text region expands into **all** the space between (centered, scrolling only as a last-resort backup). Trigger text shrunk again in [`Type.kt`](app/src/main/java/com/example/vild/ui/theme/Type.kt) (22→20 sp) so it is more likely to fit whole.
+
+### 2026-08-22T09:55 UTC
+- **Tail habit integration (WAGS protocol):**
+  - **New:** [`TailIntegrationRepository.kt`](app/src/main/java/com/example/vild/data/TailIntegrationRepository.kt): IPC with the Tail app — habit discovery via its Content Provider (`content://com.example.tail.provider/habits`), live increments via explicit permission-guarded `ACTION_INCREMENT_HABIT` broadcasts, and idempotent retroactive backfill via `ACTION_SET_HABIT_VALUES` (`{"yyyy-MM-dd": <count>}` JSON). Two slots: READ (fires once/day) and DONE (fires on every tap).
+  - [`RealityCheckDayLog.kt`](app/src/main/java/com/example/vild/data/RealityCheckDayLog.kt): new `doneCount` field — "I did it" is now repeatable; the first tap sets `doneAt` (completing the day), every tap bumps the count and sends another Tail increment.
+  - [`RealityCheckStatsRepository.kt`](app/src/main/java/com/example/vild/data/RealityCheckStatsRepository.kt): `markReadToday()` is once-only (returns null when already read → Tail dedup); `markDoneToday()` increments the round count on every call.
+  - [`NotificationHelper.kt`](app/src/main/java/com/example/vild/data/NotificationHelper.kt): the notification now lives **all day** — ongoing, with "✓ I did it" always present (repeatable, shows `×N` round count); only the nagging stops once the day is complete. [`RealityCheckActionReceiver.kt`](app/src/main/java/com/example/vild/ipc/RealityCheckActionReceiver.kt) sends the matching Tail increment on every notification action and never cancels the notification.
+  - **New:** [`TailSection.kt`](app/src/main/java/com/example/vild/ui/settings/TailSection.kt): settings section with two habit slots, a searchable/sorted habit picker dialog (WAGS-style), Refresh, and a **backfill** button pushing today's + all past days' read/done values to Tail (connecting a habit backfills automatically). Wired into [`SettingsScreen.kt`](app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt) via new `TailUiState`/APIs in [`MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt).
+- **Dream polish, round 2:**
+  - [`MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt) + [`RealityCheckCard.kt`](app/src/main/java/com/example/vild/ui/realitycheck/RealityCheckCard.kt): the main card now absorbs **all** free vertical space (content floats centered inside it) — no empty gaps above/below.
+  - [`DreamBackground.kt`](app/src/main/java/com/example/vild/ui/dream/DreamBackground.kt): stars are slightly larger and now **slide along the phone's angle** like dust on glass — heading steers toward the downhill direction of the lean, speed rises with steepness, and new stars enter from the uphill edge. Sky palette widened to 9 hues (teal, green, sky blue, gold, pink, coral, cyan, ember, lavender — new colors in [`Color.kt`](app/src/main/java/com/example/vild/ui/theme/Color.kt)) with no dominant color.
+  - [`AndroidManifest.xml`](app/src/main/AndroidManifest.xml): MainActivity locked to portrait.
+
+### 2026-08-22T09:30 UTC
+- **Dream polish pass:**
+  - [`DreamBackground.kt`](app/src/main/java/com/example/vild/ui/dream/DreamBackground.kt): stars now drift in straight lines via a `withFrameNanos` physics loop; the accelerometer acts as a gentle wind that *bends* their trajectories (tilt → curved paths, level → straight); stars leaving the screen respawn from random edges heading inward, so the sky replenishes itself. The background hue constantly cross-fades to a new random dream color every 11 s (`animateColorAsState` + rotating palette), tinting the gradient, the lead nebula orb and the breathing glow.
+  - [`AdviceBanner.kt`](app/src/main/java/com/example/vild/ui/advice/AdviceBanner.kt): restyled as a glass card — sibling of the technique banner but with its own voice (✦ glyph, rose `DreamPink` accents, `Mist` text). Tappable ‹ › arrows step through advice; swipe still works; tap opens notes.
+  - [`TechniqueBanner.kt`](app/src/main/java/com/example/vild/ui/technique/TechniqueBanner.kt): "‹ swipe ›" hint replaced by tappable ‹ › arrows; in-card label "✧ reality check idea ✧" replaces the outer section label.
+  - [`Type.kt`](app/src/main/java/com/example/vild/ui/theme/Type.kt): display typography shrunk (30→22 sp / 24→19 sp) so the main screen fits without scrolling.
+  - [`RealityCheckCard.kt`](app/src/main/java/com/example/vild/ui/realitycheck/RealityCheckCard.kt): tighter padding; overly long trigger text now scrolls *inside* the card (max 120 dp) while the screen layout stays fixed.
+  - [`MainActivity.kt`](app/src/main/java/com/example/vild/MainActivity.kt): main screen is now a single unscrolling screen — header on top, footer below, and the dream column (reality check + ideas + advice) centered in the remaining space.
+
 ### 2026-08-22T08:30 UTC
 - **Reality check techniques (ideas banner):**
   - **New:** [`TechniqueItem.kt`](app/src/main/java/com/example/vild/data/TechniqueItem.kt): `@Serializable` technique with `isSeeded` flag distinguishing classics from user-added ones.

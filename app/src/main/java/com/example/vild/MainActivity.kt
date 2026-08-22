@@ -18,15 +18,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -157,21 +153,19 @@ private fun MainScreen(
     var notesAdvice by remember { mutableStateOf<AdviceItem?>(null) }
 
     val tilt = rememberTiltState()
-    val scrollState = rememberScrollState()
 
     Box(modifier = Modifier.fillMaxSize().background(Void)) {
         DreamBackground(tilt = tilt)
 
+        // A single, unscrolling screen: header above, footer below, and the
+        // dream (reality check + ideas + advice) floating in the space between.
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Spacer(Modifier.height(8.dp))
-
             // ── Header: title + portals to stats & settings ────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -205,24 +199,28 @@ private fun MainScreen(
                 }
             }
 
-            // ── ★ Today's reality check — the heart of the app ─────────────────
-            RealityCheckCard(
-                log = todayLog,
-                readStreak = stats.currentReadStreak,
-                doneStreak = stats.currentDoneStreak,
-                onMarkRead = { vm.markRead() },
-                onMarkDone = { vm.markDone() },
-            )
+            // ── The dream itself — the main card drinks up all free space ──────
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // ★ Today's reality check — the heart of the app, given every
+                // spare pixel so no emptiness gathers above or below it.
+                RealityCheckCard(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    log = todayLog,
+                    readStreak = stats.currentReadStreak,
+                    doneStreak = stats.currentDoneStreak,
+                    onMarkRead = { vm.markRead() },
+                    onMarkDone = { vm.markDone() },
+                )
 
-            // ── Reality check ideas — how to actually test it ──────────────────
-            if (techniqueState.techniques.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "REALITY CHECK IDEAS",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Mist,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
+                // ── Reality check ideas — how to actually test it ──────────────
+                if (techniqueState.techniques.isNotEmpty()) {
                     TechniqueBanner(
                         techniques = techniqueState.techniques,
                         currentIndex = techniqueState.currentIndex,
@@ -230,29 +228,21 @@ private fun MainScreen(
                         onPrevious = { vm.previousTechnique() },
                     )
                 }
-            }
 
-            // ── Advice whisper ─────────────────────────────────────────────────
-            val currentSection = activeMode
-            val adviceList = adviceState.adviceBySection[currentSection] ?: emptyList()
-            val currentIndex = adviceState.currentIndex[currentSection] ?: 0
-            if (adviceList.isNotEmpty()) {
-                AdviceBanner(
-                    section = currentSection,
-                    adviceList = adviceList,
-                    currentIndex = currentIndex,
-                    onNext = { vm.nextRandomAdvice(currentSection) },
-                    onPrevious = { vm.previousAdvice(currentSection) },
-                    onTap = { item -> notesAdvice = item },
-                )
-            }
-
-            notesAdvice?.let { item ->
-                AdviceNotesDialog(
-                    advice = item,
-                    onSave = { notes -> vm.updateAdviceNotes(item.id, notes) },
-                    onDismiss = { notesAdvice = null },
-                )
+                // ── Advice whisper ─────────────────────────────────────────────
+                val currentSection = activeMode
+                val adviceList = adviceState.adviceBySection[currentSection] ?: emptyList()
+                val currentIndex = adviceState.currentIndex[currentSection] ?: 0
+                if (adviceList.isNotEmpty()) {
+                    AdviceBanner(
+                        section = currentSection,
+                        adviceList = adviceList,
+                        currentIndex = currentIndex,
+                        onNext = { vm.nextRandomAdvice(currentSection) },
+                        onPrevious = { vm.previousAdvice(currentSection) },
+                        onTap = { item -> notesAdvice = item },
+                    )
+                }
             }
 
             // ── Day / Night ────────────────────────────────────────────────────
@@ -275,8 +265,6 @@ private fun MainScreen(
                 )
             }
 
-            Spacer(Modifier.height(16.dp))
-
             // ── Footer ─────────────────────────────────────────────────────────
             Text(
                 text = "sleep deep · dream aware",
@@ -285,7 +273,14 @@ private fun MainScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(24.dp))
+        }
+
+        notesAdvice?.let { item ->
+            AdviceNotesDialog(
+                advice = item,
+                onSave = { notes -> vm.updateAdviceNotes(item.id, notes) },
+                onDismiss = { notesAdvice = null },
+            )
         }
     }
 }

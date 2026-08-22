@@ -25,6 +25,20 @@ val StarGold = Color(0xFFF5D491)
 /** Muted lavender-grey for secondary text. */
 val Mist = Color(0xFF9D94C7)
 
+// ── Extra hues for the ever-melting sky ───────────────────────────────────────
+// The background cycles through the whole dream spectrum — no single color
+// (and especially no single purple) is allowed to dominate.
+/** Soft aurora green. */
+val DreamGreen = Color(0xFF9BE8B0)
+/** Pale dream-sky blue. */
+val SkyBlue = Color(0xFF8FC7FF)
+/** Warm rose-coral dawn. */
+val RoseCoral = Color(0xFFFF9E9E)
+/** Cool glacial cyan. */
+val GlacierCyan = Color(0xFF8FD8E8)
+/** Deep ember orange. */
+val EmberOrange = Color(0xFFF5B971)
+
 // Translucent glass tints used by cards floating over the dream background.
 val GlassSurface = Color(0x22120B2E)
 val GlassBorder = Color(0x40C4B5FD)
