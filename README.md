@@ -1,6 +1,6 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-08-22T08:30 UTC
+> Last updated: 2026-08-22T12:06 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
 
@@ -184,6 +184,15 @@ VibeScheduler           VibeScheduler
 ---
 
 ## Changelog
+
+### 2026-08-22T12:06 UTC
+- **Dream sky: star-driven color, shake shatter, tilt-axis fix** ([`AccelerometerEffect.kt`](app/src/main/java/com/example/vild/ui/dream/AccelerometerEffect.kt), [`DreamBackground.kt`](app/src/main/java/com/example/vild/ui/dream/DreamBackground.kt)):
+  - **Fix:** the accelerometer X axis was inverted — tilting the phone's *left* edge down sent stars to the right. X is now negated so stars always slide toward the downhill edge (Y was already correct).
+  - **Predictive sky color:** the fixed 11 s hue timer is gone. Every star that newly enters the sky is tinted with the color the sky will wear *next*; after 40 new arrivals the sky crossfades to that color. Star speed is now strictly proportional to tilt — flat phone = still stars = no new arrivals = frozen color; steep phone = fast stream = quick color changes.
+  - **Shake to shatter:** new `TiltState.shake` envelope (deviation of total acceleration from pure gravity, so pure tilt never triggers it). A sustained rapid shake explodes every star outward from the center and bleeds the sky to black (nebula orbs and glow fade too). The sky stays starless and black until new stars drift back in through the uphill edge — faster the steeper the phone — and 40 arrivals relight it in the newly predicted color.
+
+### 2026-08-22T13:42 UTC
+- **Build hygiene:** root `./gradlew installDebug` also runs `:wear:installDebug`, and since both modules share `applicationId = com.example.vild`, the wear APK **replaces the phone app** when a watch isn't connected (it did, briefly). Restored the phone app with a module-scoped install — **use `./gradlew :app:installDebug` for phone-only installs**; `:wear:installDebug` is only for when a watch is the connected device.
 
 ### 2026-08-22T10:25 UTC
 - **Tail backfill bug fix — phantom "done" point:** logcat showed that during setup the READ slot was briefly mapped to the *Done* habit; its auto-backfill wrote today's read point into "Reality Check Done", and nothing ever cleared it (backfill only ever sent positive values).

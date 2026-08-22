@@ -1,14 +1,16 @@
-# ADR-005: Authoritative Tail backfill (0 = clear)
+# ADR: Star-driven dream sky (predictive color, shake shatter, tilt axis fix)
+
+Date: 2026-08-22
 
 ## Context
-After initial Tail integration (ADR-004) the user reported a phantom "done" point: during setup the READ slot was briefly mapped to the *Done* habit, and its auto-backfill wrote today's read point into "Reality Check Done". The old backfill only ever sent positive values, so nothing ever corrected Tail — the wrong point was permanent. A latent second bug: legacy day logs (created before `doneCount` existed) have `doneAt` set but `doneCount = 0`, so `filter { it.doneCount > 0 }` silently excluded them from the DONE backfill.
+The DreamBackground sky changed hue on a fixed 11s timer, decoupled from the starfield; the accelerometer X axis was sign-inverted (left-edge-down sent stars right); there was no shake interaction.
 
 ## Decision
-1. `MainViewModel.backfillTail()` is now **fully authoritative**: for every day VILD has a log it sends READ = `readAt != null ? 1 : 0` and DONE = `doneAt != null ? maxOf(1, doneCount) : 0`. Tail's `HabitValueSetReceiver` treats 0 as "remove this date's entry", so any wrongly-pushed point self-heals on the next Send. Days without a VILD log are never touched (Tail's own data is preserved).
-2. The habit picker is hardened: the dialog title names the slot ("Read"/"Done") plus a one-line description of when it fires, and a habit already mapped to the other slot is disabled with a hint — both slots can never point at the same habit again.
-3. Direct adb `am broadcast` cannot clear Tail data: the shell uid does not hold `com.example.tail.permission.TAIL_INTEGRATION`, so the signature-permission guard drops the broadcast (verified on device). Only same-keystore apps (VILD/WAGS) can write.
+1. **Tilt axes** (`AccelerometerEffect.kt`): sensor X is negated so tilt.x < 0 when the left edge dips — stars slide toward the downhill edge on both axes. TiltState gained a `shake` envelope computed as |‖a‖−g|/g with fast attack / slow decay (max(envelope*0.90, impulse*2.5)); pure tilt never changes gravity's magnitude, so the detector is tilt-invariant.
+2. **Predictive color** (`DreamBackground.kt`): the hue timer was removed. Star speed is strictly proportional to lean (`baseSpeed * lean * 2.55 * depth`) — flat phone = still stars. Every star entering the screen (respawn behind the field, or edge-spawn during regather) is tinted `dreamPalette[nextHue]` and increments a charge; at 40 arrivals the sky crossfades (3s) to that color and a new prediction is drawn. Entry rate scales with tilt, so color-change pace scales with tilt.
+3. **Shake shatter**: sustained shake (envelope > 0.55 for 0.3s, latched until envelope < 0.30) sets a FieldPhase state machine STREAM → BURST → REGATHER. BURST: all stars fly outward from screen center at 950 px/s and are nulled off-screen; skyLit=false fades sky, orbs and glow to Void (black) in 0.9s; charge resets. REGATHER: stars trickle back in through the uphill edge at ≤7/s scaled by lean, each tinted with the predicted color; 40 arrivals relight the sky. Flat phone after a shatter = permanently black until tilted.
 
 ## Consequences
-- Backfill is idempotent AND corrective — re-running Send always converges Tail to VILD's truth for logged days.
-- If the user manually adds Tail points on days VILD also logged, a backfill will overwrite/clear them for those days only (hint text in Settings says so).
-- Healing a wrong point requires tapping Send (or re-connecting a habit, which auto-backfills); no automatic backfill on app start (deliberate — avoids surprise overwrites).
+- Color pacing is emergent (tilt-driven) instead of fixed; ~10s per change at full lean, frozen when flat.
+- Tunables live as private consts (COLOR_CHARGE_NEEDED, SHAKE_TRIGGER/HOLD/REARM, BURST_SPEED, REGATHER_RATE, SLIDE_GAIN).
+- TiltState consumers (MainActivity, SettingsScreen, StatsScreen) unaffected — new field has a default.

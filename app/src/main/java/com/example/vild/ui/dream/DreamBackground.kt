@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -46,7 +47,6 @@ import com.example.vild.ui.theme.RoseCoral
 import com.example.vild.ui.theme.SkyBlue
 import com.example.vild.ui.theme.StarGold
 import com.example.vild.ui.theme.Void
-import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -64,15 +64,50 @@ private const val STAR_COUNT = 70
 /** Tilt magnitude below which the phone counts as "flat". */
 private const val FLAT_THRESHOLD = 0.04f
 
-/** Hue crossfade period — the sky never stops melting into a new color. */
-private const val HUE_PERIOD_MS = 11_000
+/** Slide-speed multiplier at full lean (phone on its side). */
+private const val SLIDE_GAIN = 2.55f
+
+/** New stars that must enter the sky before it adopts their predicted color. */
+private const val COLOR_CHARGE_NEEDED = 40
+
+/** Crossfade when the sky adopts the predicted color. */
+private const val HUE_FADE_MS = 3_000
+
+/** How fast the sky bleeds to black when it shatters. */
+private const val BLACKOUT_FADE_MS = 900
+
+/** Shake envelope above which the phone counts as "being shaken". */
+private const val SHAKE_TRIGGER = 0.55f
+
+/** How long (s) the shake must persist before the sky shatters. */
+private const val SHAKE_HOLD_SECONDS = 0.30f
+
+/** Shake envelope below which the shatter trigger re-arms. */
+private const val SHAKE_REARM = 0.30f
+
+/** Outward speed of exploding stars, px per second. */
+private const val BURST_SPEED = 950f
+
+/** Edge entries per second at full lean while the sky regathers. */
+private const val REGATHER_RATE = 7f
+
+/**
+ * Lifecycle of the starfield.
+ *  - [STREAM] — the normal, continuous field: stars that slide off respawn
+ *    from the uphill edge, each one charging the next sky color.
+ *  - [BURST] — a shake shattered the sky: every star flies outward and is
+ *    removed once it leaves the screen.
+ *  - [REGATHER] — the field is empty; new stars drift back in through the
+ *    uphill edge (faster the steeper the phone), rebuilding the charge that
+ *    will relight the sky.
+ */
+private enum class FieldPhase { STREAM, BURST, REGATHER }
 
 /**
  * A star sliding across the dream sky. Each star travels along a heading;
  * the phone's angle decides that heading — stars slide "downhill" along
  * whatever way the device is leaning, like dust on glass. Speed rises with
- * the steepness of the lean; on a flat phone they keep drifting gently in
- * whatever direction they last had.
+ * the steepness of the lean; on a flat phone the sky is still.
  */
 private class DriftingStar(
     var x: Float,
@@ -83,7 +118,8 @@ private class DriftingStar(
     val phase: Float,
     val twinkleSpeed: Float,
     val depth: Float,
-    val color: Color,
+    var color: Color,
+    var exploding: Boolean = false,
 )
 
 /** Scatter a brand-new star somewhere inside the screen. */
@@ -143,12 +179,16 @@ private fun respawnBehind(star: DriftingStar, w: Float, h: Float) {
 /**
  * The living background of the whole app.
  *
- *  - The sky color never settles: it constantly cross-fades through a wide
- *    spectrum of dream hues — teal, green, sky blue, gold, pink, coral,
- *    cyan, ember, lavender — so no single color dominates the dream.
- *  - Stars slide along the phone's angle, like dust gliding down a pane of
- *    glass however it is tilted. Steeper lean → faster slide; new stars
- *    keep entering from the uphill edge so the sky replenishes itself.
+ *  - Stars slide along the phone's lean like dust on a pane of glass:
+ *    steeper lean → faster slide, flat phone → stillness. Every star that
+ *    newly enters the sky is tinted with the color the sky will wear NEXT,
+ *    so fresh arrivals literally predict the next hue. Once enough new
+ *    stars have drifted through, the sky melts into that color. A phone
+ *    lying flat admits no new stars — and the color never changes.
+ *  - Shake the phone rapidly and the sky shatters: stars explode outward
+ *    and the sky bleeds to black. It stays dark — starless, colorless —
+ *    until enough new stars drift back in to predict (and summon) the
+ *    next color.
  *  - Nebula orbs and a breathing glow keep the depth, parallaxed by tilt.
  */
 @Composable
@@ -182,25 +222,30 @@ fun DreamBackground(
         label = "time",
     )
 
-    // ── The ever-melting sky hue — the full dream spectrum, none dominant ────
+    // ── The sky's color — summoned by the stars that drift in ────────────────
     val dreamPalette = remember {
         listOf(
             AuroraTeal, DreamGreen, SkyBlue, StarGold, DreamPink,
             RoseCoral, GlacierCyan, EmberOrange, MoonLavender,
         )
     }
+    // Which palette color the sky wears right now, and whether it is lit
+    // at all (a shattered sky is pitch black until stars regather).
     var hueIndex by remember { mutableIntStateOf(0) }
-    LaunchedEffect(dreamPalette) {
-        while (true) {
-            delay(HUE_PERIOD_MS.toLong())
-            // Pick a *different* hue each time — never the one we just left.
-            hueIndex = (hueIndex + 1 + Random.nextInt(dreamPalette.size - 1)) % dreamPalette.size
-        }
-    }
+    var skyLit by remember { mutableStateOf(true) }
     val dreamHue by animateColorAsState(
-        targetValue = dreamPalette[hueIndex],
-        animationSpec = tween(HUE_PERIOD_MS, easing = LinearEasing),
+        targetValue = if (skyLit) dreamPalette[hueIndex] else Void,
+        animationSpec = tween(
+            if (skyLit) HUE_FADE_MS else BLACKOUT_FADE_MS,
+            easing = LinearEasing,
+        ),
         label = "dreamHue",
+    )
+    // Orbs and glow fade out with the shattered sky so black means black.
+    val orbGlow by animateFloatAsState(
+        targetValue = if (skyLit) 1f else 0f,
+        animationSpec = tween(BLACKOUT_FADE_MS, easing = LinearEasing),
+        label = "orbGlow",
     )
 
     // ── Sliding starfield ─────────────────────────────────────────────────────
@@ -211,6 +256,14 @@ fun DreamBackground(
 
     LaunchedEffect(Unit) {
         var last = 0L
+        // The color the arriving stars predict — the sky's next outfit.
+        var nextHue = 1 + Random.nextInt(dreamPalette.size - 1)
+        var colorCharge = 0
+        var shakeHold = 0f
+        var shakeArmed = true
+        var phase = FieldPhase.STREAM
+        var fieldSeeded = false
+
         while (true) {
             val now = withFrameNanos { it }
             val dt = ((now - last) / 1_000_000_000f).coerceIn(0f, 0.05f)
@@ -218,6 +271,13 @@ fun DreamBackground(
             val w = canvasSize.width.toFloat()
             val h = canvasSize.height.toFloat()
             if (w > 0f && h > 0f) {
+                // First frame with a real canvas: scatter the initial field.
+                // (STREAM keeps every slot alive from here on — only REGATHER
+                // refills slots, and only one star at a time.)
+                if (!fieldSeeded) {
+                    for (i in 0 until STAR_COUNT) stars[i] = newStar(w, h)
+                    fieldSeeded = true
+                }
                 val tx = currentTilt.x
                 val ty = currentTilt.y
                 val lean = sqrt(tx * tx + ty * ty)
@@ -225,22 +285,98 @@ fun DreamBackground(
                 val downhill: Float? =
                     if (lean > FLAT_THRESHOLD) atan2(ty, tx) else null
 
+                // ── Rapid shaking shatters the sky ─────────────────────────
+                val shake = currentTilt.shake
+                if (shakeArmed && shake > SHAKE_TRIGGER) {
+                    shakeHold += dt
+                    if (shakeHold >= SHAKE_HOLD_SECONDS) {
+                        val cx = w / 2f
+                        val cy = h / 2f
+                        for (i in 0 until STAR_COUNT) {
+                            val star = stars[i] ?: continue
+                            star.heading = atan2(star.y - cy, star.x - cx)
+                            star.exploding = true
+                        }
+                        skyLit = false
+                        colorCharge = 0
+                        phase = FieldPhase.BURST
+                        shakeArmed = false
+                        shakeHold = 0f
+                    }
+                } else {
+                    shakeHold = 0f
+                    if (shake < SHAKE_REARM) shakeArmed = true
+                }
+
+                // ── While regathering: fresh stars drift back in through the
+                //    uphill edge, faster the steeper the phone. Each arrival
+                //    is tinted with the color it predicts. ──────────────────
+                if (phase == FieldPhase.REGATHER && downhill != null &&
+                    Random.nextFloat() < REGATHER_RATE * lean * dt
+                ) {
+                    val slot = Random.nextInt(STAR_COUNT)
+                    if (stars[slot] == null) {
+                        val s = newStar(w, h)
+                        s.heading = downhill
+                        respawnBehind(s, w, h)
+                        s.color = dreamPalette[nextHue]
+                        stars[slot] = s
+                        colorCharge++
+                    }
+                }
+
+                var alive = 0
                 for (i in 0 until STAR_COUNT) {
-                    val star = stars[i] ?: newStar(w, h).also { stars[i] = it }
+                    val star = stars[i] ?: continue
+                    alive++
+
+                    if (star.exploding) {
+                        star.x += cos(star.heading) * BURST_SPEED * dt
+                        star.y += sin(star.heading) * BURST_SPEED * dt
+                        if (star.x < -STAR_MARGIN || star.x > w + STAR_MARGIN ||
+                            star.y < -STAR_MARGIN || star.y > h + STAR_MARGIN
+                        ) {
+                            stars[i] = null
+                            alive--
+                        }
+                        continue
+                    }
+
                     if (downhill != null) {
                         // Steer smoothly along the shortest arc toward downhill.
                         star.heading += angleDelta(star.heading, downhill) *
                             (3f * dt).coerceAtMost(1f)
                     }
-                    // Steeper phone → faster slide; flat phone → gentle drift.
-                    val speed = star.baseSpeed * (0.35f + (lean * 2.4f).coerceAtMost(2.2f)) * star.depth
+                    // Steeper phone → faster slide; flat phone → stillness.
+                    val speed = star.baseSpeed * (lean * SLIDE_GAIN) * star.depth
                     star.x += cos(star.heading) * speed * dt
                     star.y += sin(star.heading) * speed * dt
                     if (star.x < -STAR_MARGIN || star.x > w + STAR_MARGIN ||
                         star.y < -STAR_MARGIN || star.y > h + STAR_MARGIN
                     ) {
-                        respawnBehind(star, w, h)
+                        if (phase == FieldPhase.BURST) {
+                            stars[i] = null
+                            alive--
+                        } else {
+                            respawnBehind(star, w, h)
+                            // Every newborn star carries the color the sky
+                            // will wear next — the prediction mechanic.
+                            star.color = dreamPalette[nextHue]
+                            colorCharge++
+                        }
                     }
+                }
+
+                if (phase == FieldPhase.BURST && alive == 0) phase = FieldPhase.REGATHER
+                if (phase == FieldPhase.REGATHER && alive == STAR_COUNT) phase = FieldPhase.STREAM
+
+                // ── Enough new stars arrived: the sky adopts their color ────
+                if (colorCharge >= COLOR_CHARGE_NEEDED) {
+                    hueIndex = nextHue
+                    nextHue = (nextHue + 1 + Random.nextInt(dreamPalette.size - 1)) %
+                        dreamPalette.size
+                    colorCharge = 0
+                    skyLit = true
                 }
             }
             frame++
@@ -265,7 +401,7 @@ fun DreamBackground(
         NebulaOrb(
             size = 420.dp,
             color = dreamHue,
-            alpha = 0.30f,
+            alpha = 0.30f * orbGlow,
             offsetX = currentTilt.x * -34f + driftA,
             offsetY = currentTilt.y * -34f + driftB,
             alignment = { androidx.compose.ui.Alignment.TopStart },
@@ -273,7 +409,7 @@ fun DreamBackground(
         NebulaOrb(
             size = 520.dp,
             color = GlacierCyan,
-            alpha = 0.13f,
+            alpha = 0.13f * orbGlow,
             offsetX = currentTilt.x * -58f + driftB,
             offsetY = currentTilt.y * -58f + driftA,
             alignment = { androidx.compose.ui.Alignment.BottomEnd },
@@ -281,7 +417,7 @@ fun DreamBackground(
         NebulaOrb(
             size = 360.dp,
             color = DreamPink,
-            alpha = 0.15f,
+            alpha = 0.15f * orbGlow,
             offsetX = currentTilt.x * -22f + driftA,
             offsetY = currentTilt.y * -22f + driftB,
             alignment = { androidx.compose.ui.Alignment.Center },
@@ -293,7 +429,7 @@ fun DreamBackground(
                 .size(300.dp)
                 .align(androidx.compose.ui.Alignment.Center)
                 .scale(breath)
-                .alpha(0.22f)
+                .alpha(0.22f * orbGlow)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
