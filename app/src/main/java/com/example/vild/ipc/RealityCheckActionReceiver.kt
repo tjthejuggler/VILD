@@ -17,12 +17,12 @@ private const val TAG = "RealityCheckActionReceiver"
 
 /**
  * Handles the action buttons on the reality check notification:
- * "✓ Read" (once) and "✓ Done" (repeatable — every tap logs another round).
+ * "✓ Read" and "✓ Done" — both repeatable, every tap logs another round.
  *
  * Each successful action also increments the matching habit in the Tail app.
  * The notification itself is never cancelled: it lives all day as the home
- * of the repeatable "I did it" action; only the nagging stops once the day
- * is complete.
+ * of the repeatable "I read it" / "I did it" actions; only the nagging stops
+ * once the day is complete.
  */
 class RealityCheckActionReceiver : BroadcastReceiver() {
 
@@ -47,8 +47,8 @@ class RealityCheckActionReceiver : BroadcastReceiver() {
                 val repo = RealityCheckStatsRepository(appContext)
                 val tail = TailIntegrationRepository(appContext)
                 val log = if (action == ACTION_MARK_READ) {
-                    // markReadToday() returns null when already read — the Tail
-                    // increment is only sent on the first confirmation.
+                    // Repeatable by design: every tap bumps readCount and sends
+                    // another increment to Tail.
                     repo.markReadToday()?.also {
                         tail.sendHabitIncrement(TailIntegrationRepository.Slot.READ)
                     }
@@ -61,7 +61,7 @@ class RealityCheckActionReceiver : BroadcastReceiver() {
                 }
 
                 if (log == null) {
-                    Log.d(TAG, "Nothing to mark (already read, or no log yet)")
+                    Log.d(TAG, "Nothing to mark (no log for today yet)")
                 } else {
                     // Refresh the notification (it stays all day) and stop the
                     // nagging once the day is complete.

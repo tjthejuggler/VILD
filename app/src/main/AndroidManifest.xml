@@ -59,6 +59,22 @@
         </receiver>
 
         <!--
+            BroadcastReceiver: reverse half of the Tail integration. When Tail
+            announces a habit increment (ACTION_HABIT_INCREMENTED) for a habit
+            mapped to VILD's READ or DONE slot, the increment is applied to
+            VILD's own day log — so increments flow BOTH ways. Echoes of VILD's
+            own increments are ignored via the EXTRA_SOURCE tag.
+        -->
+        <receiver
+            android:name=".ipc.TailHabitSyncReceiver"
+            android:exported="true"
+            android:permission="com.example.tail.permission.TAIL_INTEGRATION">
+            <intent-filter>
+                <action android:name="com.example.tail.ACTION_HABIT_INCREMENTED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
             BroadcastReceiver: fires the daily reality check notification at 8 AM.
             Also handles BOOT_COMPLETED to reschedule the alarm after reboot.
         -->

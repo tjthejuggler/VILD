@@ -57,9 +57,9 @@ object NotificationHelper {
      * Shows (or refreshes) the notification for [log].
      *
      * The notification lives all day: even after the check is complete it
-     * stays pinned with the "✓ I did it" action — every tap of it logs one
-     * more done round in the Tail app. Only the next morning's trigger
-     * replaces it.
+     * stays pinned with the "✓ I read it" / "✓ I did it" actions — every
+     * tap of them logs one more round in the Tail app. Only the next
+     * morning's trigger replaces it.
      */
     fun showNotification(context: Context, log: RealityCheckDayLog) {
         ensureChannel(context)
@@ -68,13 +68,16 @@ object NotificationHelper {
         val done = log.doneAt != null
 
         val title = when {
-            read && done -> "Reality check ✓ — tap “I did it” for extra rounds"
+            read && done -> "Reality check ✓ — tap “I read it” / “I did it” for extra rounds"
             read && !done -> "Read ✓ — now DO the check"
             done && !read -> "Done ✓ — mark it as read"
             else -> "Today's Reality Check"
         }
         val statusLine = buildString {
-            if (read) append("✓ read ${formatTime(log.readAt)}")
+            if (read) {
+                append("✓ read ${formatTime(log.readAt)}")
+                if (log.readCount > 1) append(" ×${log.readCount}")
+            }
             if (read && done) append("  ·  ")
             if (done) {
                 append("✓ done ${formatTime(log.doneAt)}")
@@ -109,13 +112,12 @@ object NotificationHelper {
             .setContentIntent(contentIntent)
             .setAutoCancel(false)
             // Ongoing all day — the notification is the home of the repeatable
-            // "I did it" action, so it must not be dismissable before midnight.
+            // "I read it" / "I did it" actions, so it must not be dismissable
+            // before midnight.
             .setOngoing(true)
 
-        if (!read) {
-            builder.addAction(0, "✓ I read it", actionIntent(RealityCheckActionReceiver.ACTION_MARK_READ, 1))
-        }
-        // Always present — repeatable, every tap logs another done round in Tail.
+        // Always present — repeatable, every tap logs another round in Tail.
+        builder.addAction(0, "✓ I read it", actionIntent(RealityCheckActionReceiver.ACTION_MARK_READ, 1))
         builder.addAction(0, "✓ I did it", actionIntent(RealityCheckActionReceiver.ACTION_MARK_DONE, 2))
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

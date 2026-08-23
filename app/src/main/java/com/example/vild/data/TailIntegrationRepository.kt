@@ -26,7 +26,8 @@ data class TailHabit(
  *    with a `{"yyyy-MM-dd": <count>}` JSON map (SET semantics, idempotent).
  *
  * VILD has two slots:
- *  • [Slot.READ] — fired once, the first time the user confirms "I read it".
+ *  • [Slot.READ] — fired every single time the user taps "I read it" (the
+ *    button is intentionally repeatable so extra rounds land in Tail).
  *  • [Slot.DONE] — fired every single time the user taps "I did it" (the
  *    button is intentionally repeatable so extra rounds land in Tail).
  */
@@ -126,6 +127,10 @@ class TailIntegrationRepository(private val context: Context) {
                 `package` = HABIT_APP_PACKAGE
                 putExtra(EXTRA_HABIT_ID, habitName)
                 putExtra(EXTRA_SLOT, slot.name)
+                // Tag the originator so Tail's ACTION_HABIT_INCREMENTED
+                // announcement of this same increment can be recognised as an
+                // echo by TailHabitSyncReceiver (bidirectional loop safety).
+                putExtra(EXTRA_SOURCE, context.packageName)
             }
             // receiverPermission ensures only the Tail app (which declared the
             // signature permission) can receive this broadcast.
@@ -211,6 +216,18 @@ class TailIntegrationRepository(private val context: Context) {
 
         /** Extra key carrying the originating VILD slot name (informational). */
         const val EXTRA_SLOT = "vild_slot"
+
+        /** Broadcast action Tail fires after EVERY successful habit increment. */
+        const val ACTION_HABIT_INCREMENTED = "com.example.tail.ACTION_HABIT_INCREMENTED"
+
+        /** Extra on ACTION_HABIT_INCREMENTED: the incremented habit's name. */
+        const val EXTRA_HABIT_NAME = "EXTRA_HABIT_NAME"
+
+        /** Extra on ACTION_HABIT_INCREMENTED: the applied count delta (0 = no-op). */
+        const val EXTRA_AMOUNT = "EXTRA_AMOUNT"
+
+        /** Extra identifying the originating app; VILD tags its own increments. */
+        const val EXTRA_SOURCE = "EXTRA_SOURCE"
 
         /** Broadcast action for the idempotent retroactive backfill. */
         const val ACTION_SET_HABIT_VALUES = "com.example.tail.ACTION_SET_HABIT_VALUES"

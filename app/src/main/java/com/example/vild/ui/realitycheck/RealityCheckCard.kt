@@ -131,14 +131,21 @@ fun RealityCheckCard(
             Spacer(Modifier.height(2.dp))
 
             // ── Confirmation buttons ───────────────────────────────────────────
+            // Both are deliberately repeatable: every tap logs another round in
+            // the Tail app. The first tap of each is what sets readAt/doneAt.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 ConfirmButton(
-                    label = if (read) "✓ Read ${formatTime(log?.readAt)}" else "I read it",
+                    label = when {
+                        read && (log?.readCount ?: 0) > 1 ->
+                            "✓ Read ×${log?.readCount} — again?"
+                        read -> "✓ Read ${formatTime(log?.readAt)} — again?"
+                        else -> "I read it"
+                    },
                     confirmed = read,
-                    enabled = !read && log != null,
+                    enabled = log != null,
                     onClick = onMarkRead,
                     modifier = Modifier.weight(1f),
                 )
@@ -150,8 +157,6 @@ fun RealityCheckCard(
                         else -> "I did it"
                     },
                     confirmed = done,
-                    // Deliberately repeatable: every tap logs another done round
-                    // in the Tail app. Only "read" is locked after first press.
                     enabled = log != null,
                     onClick = onMarkDone,
                     modifier = Modifier.weight(1f),

@@ -603,8 +603,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ── Reality check daily confirmation API ───────────────────────────────────
 
     /**
-     * Confirms the user has READ today's reality check — once. The first
-     * confirmation also increments the Tail habit mapped to READ.
+     * Records one more "I read it" round — deliberately repeatable. Every
+     * single tap increments the Tail habit mapped to READ; the first tap is
+     * what sets readAt (and helps complete the day).
      */
     fun markRead() = markToday { repo ->
         repo.markReadToday()?.also {
@@ -666,11 +667,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Sends every logged day's read/done values to Tail with SET semantics —
-     * fully authoritative and idempotent. Read days send 1 (0 when the check
-     * was never read); done days send the done-round count (0 when never
-     * done). Tail treats 0 as "clear this date", so a point that was pushed
-     * to the wrong habit (e.g. while a slot was briefly mis-mapped) is wiped
-     * on the next backfill. Days VILD has no log for are left untouched.
+     * fully authoritative and idempotent. Read days send the read-round count
+     * (0 when the check was never read); done days send the done-round count
+     * (0 when never done). Tail treats 0 as "clear this date", so a point
+     * that was pushed to the wrong habit (e.g. while a slot was briefly
+     * mis-mapped) is wiped on the next backfill. Days VILD has no log for
+     * are left untouched.
      */
     fun backfillTail() {
         _tailState.update { it.copy(backfilling = true, message = null, error = null) }
@@ -681,7 +683,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     tailRepo.sendHabitValuesForDates(
                         TailIntegrationRepository.Slot.READ,
                         logs.associate {
-                            dateKey(it.epochDay) to if (it.readAt != null) 1 else 0
+                            // Legacy logs predate readCount: readAt set, count 0 → count as 1.
+                            dateKey(it.epochDay) to
+                                if (it.readAt != null) maxOf(1, it.readCount) else 0
                         },
                     )
                     tailRepo.sendHabitValuesForDates(

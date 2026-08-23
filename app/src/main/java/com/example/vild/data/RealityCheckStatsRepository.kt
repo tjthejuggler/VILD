@@ -56,16 +56,16 @@ class RealityCheckStatsRepository(private val context: Context) {
     }
 
     /**
-     * Sets [RealityCheckDayLog.readAt] for today — once. Returns null when the
-     * check was already marked read (so callers can deduplicate side effects
-     * like Tail habit increments).
+     * Records one more "I read it" round for today. The button is repeatable:
+     * the first call sets [RealityCheckDayLog.readAt] and every call —
+     * including later ones — bumps [RealityCheckDayLog.readCount].
      */
-    suspend fun markReadToday(): RealityCheckDayLog? {
-        val alreadyRead = loadAll(context.dayLogDataStore.data.first())
-            .firstOrNull { it.epochDay == todayEpochDay() }
-            ?.readAt != null
-        if (alreadyRead) return null
-        return updateToday { it.copy(readAt = System.currentTimeMillis()) }
+    suspend fun markReadToday(): RealityCheckDayLog? = updateToday {
+        val now = System.currentTimeMillis()
+        it.copy(
+            readAt = it.readAt ?: now,
+            readCount = it.readCount + 1,
+        )
     }
 
     /**

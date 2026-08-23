@@ -1,16 +1,24 @@
-# ADR: Star-driven dream sky (predictive color, shake shatter, tilt axis fix)
+# ADR: "I read it" is repeatable, symmetric with "I did it"
 
-Date: 2026-08-22
+**Status:** Accepted (2026-08-23)
 
 ## Context
-The DreamBackground sky changed hue on a fixed 11s timer, decoupled from the starfield; the accelerometer X axis was sign-inverted (left-edge-down sent stars right); there was no shake interaction.
+The daily reality check has two confirmations: READ and DONE. DONE was designed as a repeatable action (first tap sets `doneAt`, every tap bumps `doneCount` and sends a Tail habit increment). READ was once-per-day: `markReadToday()` returned null after the first tap, the in-app button disabled itself, the notification dropped its "✓ I read it" action, and the Tail reverse-sync applied READ increments only once.
+
+The user wants both buttons to behave identically everywhere: repeatable, in-app, in the notification, and in the Tail integration (both directions).
 
 ## Decision
-1. **Tilt axes** (`AccelerometerEffect.kt`): sensor X is negated so tilt.x < 0 when the left edge dips — stars slide toward the downhill edge on both axes. TiltState gained a `shake` envelope computed as |‖a‖−g|/g with fast attack / slow decay (max(envelope*0.90, impulse*2.5)); pure tilt never changes gravity's magnitude, so the detector is tilt-invariant.
-2. **Predictive color** (`DreamBackground.kt`): the hue timer was removed. Star speed is strictly proportional to lean (`baseSpeed * lean * 2.55 * depth`) — flat phone = still stars. Every star entering the screen (respawn behind the field, or edge-spawn during regather) is tinted `dreamPalette[nextHue]` and increments a charge; at 40 arrivals the sky crossfades (3s) to that color and a new prediction is drawn. Entry rate scales with tilt, so color-change pace scales with tilt.
-3. **Shake shatter**: sustained shake (envelope > 0.55 for 0.3s, latched until envelope < 0.30) sets a FieldPhase state machine STREAM → BURST → REGATHER. BURST: all stars fly outward from screen center at 950 px/s and are nulled off-screen; skyLit=false fades sky, orbs and glow to Void (black) in 0.9s; charge resets. REGATHER: stars trickle back in through the uphill edge at ≤7/s scaled by lean, each tinted with the predicted color; 40 arrivals relight the sky. Flat phone after a shatter = permanently black until tilted.
+READ becomes an exact structural mirror of DONE:
+
+1. `RealityCheckDayLog` gains `readCount: Int` (default 0), analogous to `doneCount`. `readAt` keeps its "first tap" semantics (`readAt ?: now`) exactly like `doneAt`.
+2. `RealityCheckStatsRepository.markReadToday()` mirrors `markDoneToday()`: always applies `readAt = readAt ?: now, readCount += 1` and returns the updated log (null only when no log exists for today).
+3. `RealityCheckActionReceiver` (notification actions) and `MainViewModel.markRead` (in-app button): every tap sends a Tail READ habit increment — the old null-based dedupe is gone.
+4. `NotificationHelper`: the "✓ I read it" action is always present (previously hidden after first read); status line shows `×N` read rounds like done rounds.
+5. `RealityCheckCard`: read button is always enabled; label mirrors done ("✓ Read ×N — again?").
+6. `TailHabitSyncReceiver` (Tail → VILD): READ habit increments apply per-amount via `repeat(amount)`, same as DONE.
+7. `MainViewModel.backfillTail()`: READ backfill sends `maxOf(1, readCount)` per day (legacy logs predate `readCount`, so `readAt != null && readCount == 0` counts as 1 — same rule DONE already used).
 
 ## Consequences
-- Color pacing is emergent (tilt-driven) instead of fixed; ~10s per change at full lean, frozen when flat.
-- Tunables live as private consts (COLOR_CHARGE_NEEDED, SHAKE_TRIGGER/HOLD/REARM, BURST_SPEED, REGATHER_RATE, SLIDE_GAIN).
-- TiltState consumers (MainActivity, SettingsScreen, StatsScreen) unaffected — new field has a default.
+- Stats/streaks are day-level (`readAt != null`) and are unchanged by extra taps.
+- `readCount` is backward-compatible: kotlinx.serialization defaults it to 0 for existing JSON logs.
+- Echo-suppression loop safety between VILD and Tail is untouched (EXTRA_SOURCE mechanism).
