@@ -286,14 +286,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         NotificationHelper.ensureChannel(application)
         DailyTriggerScheduler.schedule(application)
         // Make sure today's reality check exists the moment the app opens,
-        // and arm the nag cycle if it is still unconfirmed.
+        // and arm the (adaptive) nag cycle if today's goals are unmet.
         viewModelScope.launch {
             runCatching {
                 val triggers = triggerRepo.allTriggersFlow.first()
                 val log = statsRepo.ensureTodayLog(triggers)
-                if (!log.isComplete) {
+                NagScheduler.nextIntervalMs(log)?.let { interval ->
                     NotificationHelper.showNotification(application, log)
-                    NagScheduler.schedule(application)
+                    NagScheduler.schedule(application, interval)
                 }
             }
         }

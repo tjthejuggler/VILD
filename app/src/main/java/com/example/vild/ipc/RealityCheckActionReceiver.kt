@@ -64,10 +64,10 @@ class RealityCheckActionReceiver : BroadcastReceiver() {
                     Log.d(TAG, "Nothing to mark (no log for today yet)")
                 } else {
                     // Refresh the notification (it stays all day) and stop the
-                    // nagging once the day is complete.
+                    // nagging once the daily goals are met.
                     NotificationHelper.showNotification(appContext, log)
-                    if (log.isComplete) {
-                        Log.d(TAG, "Check complete — disarming nag (notification stays)")
+                    if (log.goalsMet) {
+                        Log.d(TAG, "Daily goals met — disarming nag (notification stays)")
                         NagScheduler.cancel(appContext)
                     }
                 }

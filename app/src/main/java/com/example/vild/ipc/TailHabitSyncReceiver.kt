@@ -100,10 +100,11 @@ class TailHabitSyncReceiver : BroadcastReceiver() {
                 }
 
                 // Keep the notification in step with the new state, mirroring
-                // MainViewModel.markToday — stop the nagging once complete.
+                // MainViewModel.markToday — stop the nagging once the daily
+                // goals are met.
                 log?.let {
                     NotificationHelper.showNotification(appContext, it)
-                    if (it.isComplete) NagScheduler.cancel(appContext)
+                    if (it.goalsMet) NagScheduler.cancel(appContext)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to apply Tail increment for '$habitName': ${e.message}", e)

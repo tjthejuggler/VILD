@@ -38,9 +38,11 @@ class BootReceiver : BroadcastReceiver() {
             try {
                 val repo = RealityCheckStatsRepository(appContext)
                 val today = repo.allLogsFlow.first().firstOrNull { it.epochDay == todayEpochDay() }
-                if (today != null && !today.isComplete) {
-                    Log.d(TAG, "Today's check still unconfirmed — re-arming nag")
-                    NagScheduler.schedule(appContext)
+                if (today != null && !today.goalsMet) {
+                    Log.d(TAG, "Today's goals unmet — re-arming nag")
+                    NagScheduler.nextIntervalMs(today)?.let { ms ->
+                        NagScheduler.schedule(appContext, ms)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Boot nag re-arm failed: ${e.message}", e)

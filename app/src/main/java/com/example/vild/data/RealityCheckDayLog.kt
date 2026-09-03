@@ -40,7 +40,25 @@ data class RealityCheckDayLog(
 ) {
     /** True once the user has confirmed both reading and doing the check. */
     val isComplete: Boolean get() = readAt != null && doneAt != null
+
+    /**
+     * How many practice rounds are still needed today to hit the daily goals
+     * ([DAILY_READ_GOAL] reads + [DAILY_DONE_GOAL] dones). Drives the adaptive
+     * nag frequency: more remaining rounds → more frequent notifications.
+     */
+    val unitsRemaining: Int
+        get() = (DAILY_READ_GOAL - readCount).coerceAtLeast(0) +
+            (DAILY_DONE_GOAL - doneCount).coerceAtLeast(0)
+
+    /** True once both daily goals are hit — no more nagging needed today. */
+    val goalsMet: Boolean get() = readCount >= DAILY_READ_GOAL && doneCount >= DAILY_DONE_GOAL
 }
+
+/** Daily goal: how many times the user wants to READ the trigger. */
+const val DAILY_READ_GOAL = 5
+
+/** Daily goal: how many times the user wants to DO the trigger. */
+const val DAILY_DONE_GOAL = 2
 
 /** Today's epoch day in the local time zone. */
 fun todayEpochDay(): Long = LocalDate.now().toEpochDay()

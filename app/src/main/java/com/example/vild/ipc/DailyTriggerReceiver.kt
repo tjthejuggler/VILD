@@ -47,9 +47,9 @@ class DailyTriggerReceiver : BroadcastReceiver() {
                 Log.d(TAG, "Today's reality check: ${todayLog.triggerText}")
                 NotificationHelper.showNotification(appContext, todayLog)
 
-                // Keep bothering until read AND done.
-                if (!todayLog.isComplete) {
-                    NagScheduler.schedule(appContext)
+                // Keep bothering (adaptively) until the daily goals are met.
+                NagScheduler.nextIntervalMs(todayLog)?.let {
+                    NagScheduler.schedule(appContext, it)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to show daily trigger: ${e.message}", e)

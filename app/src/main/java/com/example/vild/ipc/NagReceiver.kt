@@ -39,20 +39,21 @@ class NagReceiver : BroadcastReceiver() {
                 val repo = RealityCheckStatsRepository(appContext)
                 val today = repo.allLogsFlow.first().firstOrNull { it.epochDay == todayEpochDay() }
 
-                when {
-                    today == null -> {
+                val interval = when {
+                    today == null -> null.also {
                         Log.d(TAG, "No log for today — nag cycle ends")
-                        NagScheduler.cancel(appContext)
                     }
-                    today.isComplete -> {
-                        Log.d(TAG, "Today's check is complete — nag cycle ends")
-                        NagScheduler.cancel(appContext)
+                    else -> NagScheduler.nextIntervalMs(today!!).also {
+                        if (it == null) Log.d(TAG, "Daily goals met or day over — nag cycle ends")
                     }
-                    else -> {
-                        Log.d(TAG, "Check still unconfirmed — re-posting notification")
-                        NotificationHelper.showNotification(appContext, today)
-                        NagScheduler.schedule(appContext)
-                    }
+                }
+
+                if (interval == null || today == null) {
+                    NagScheduler.cancel(appContext)
+                } else {
+                    Log.d(TAG, "Goals unmet — re-posting notification, next nag in ${interval / 60000} min")
+                    NotificationHelper.showNotification(appContext, today)
+                    NagScheduler.schedule(appContext, interval)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Nag failed: ${e.message}", e)
