@@ -148,7 +148,6 @@ private fun MainScreen(
     val activeMode by vm.activeMode.collectAsState()
     val adviceState by vm.adviceState.collectAsState()
     val techniqueState by vm.techniqueState.collectAsState()
-    val syncStatus by vm.syncStatus.collectAsState()
 
     var notesAdvice by remember { mutableStateOf<AdviceItem?>(null) }
 
@@ -247,23 +246,6 @@ private fun MainScreen(
 
             // ── Day / Night ────────────────────────────────────────────────────
             DreamDayNightToggle(activeMode = activeMode, onToggle = { vm.toggleMode() })
-
-            // ── Sync status (subtle whisper) ───────────────────────────────────
-            if (syncStatus.lastSyncTimestamp != 0L) {
-                val secondsAgo =
-                    ((System.currentTimeMillis() - syncStatus.lastSyncTimestamp) / 1_000).toInt()
-                Text(
-                    text = if (syncStatus.lastSyncSuccess) {
-                        "✧ watch synced ${secondsAgo}s ago"
-                    } else {
-                        "✧ watch sync failed"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (syncStatus.lastSyncSuccess) Mist else MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
 
             // ── Footer ─────────────────────────────────────────────────────────
             Text(

@@ -10,8 +10,11 @@ import com.example.vild.data.AdviceRepository
 import com.example.vild.data.AppSettingsRepository
 import com.example.vild.data.DailyTriggerScheduler
 import com.example.vild.data.NagScheduler
+import com.example.vild.data.NightVibeLogRepository
+import com.example.vild.data.NightVibeNotifier
+import com.example.vild.data.NightVibeScheduler
+import com.example.vild.data.NightVibeSettings
 import com.example.vild.data.NotificationHelper
-import com.example.vild.data.Preset
 import com.example.vild.data.RealityCheckDayLog
 import com.example.vild.data.RealityCheckRepository
 import com.example.vild.data.RealityCheckStats
@@ -21,13 +24,9 @@ import com.example.vild.data.TailHabit
 import com.example.vild.data.TailIntegrationRepository
 import com.example.vild.data.TechniqueItem
 import com.example.vild.data.TechniqueRepository
-import com.example.vild.data.VibeSettings
-import com.example.vild.data.WearSyncManager
 import com.example.vild.data.computeStats
 import com.example.vild.data.todayEpochDay
-import com.example.vild.shared.VibeConstants
 import com.example.vild.ui.advice.AdviceSection
-import com.google.android.gms.wearable.Node
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -41,17 +40,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 
 private const val TAG = "MainViewModel"
-
-/**
- * Represents the result of the most recent settings push to the Wearable Data Layer.
- *
- * @property lastSyncTimestamp epoch-ms of the last push attempt; 0 means never synced.
- * @property lastSyncSuccess   true if the last push succeeded, false if it threw.
- */
-data class SyncStatus(
-    val lastSyncTimestamp: Long = 0L,
-    val lastSyncSuccess: Boolean = true,
-)
 
 /**
  * UI state for the advice feature.
@@ -89,7 +77,7 @@ data class TechniqueUiState(
  * @property doneHabit   Selected Tail habit name for the "done" event ("" = none).
  * @property backfilling True while the retroactive backfill broadcast is queued.
  * @property message     Last success message (dismissable).
- * @property error       Last error message (dismissable).
+ * @property error       Last error (dismissable).
  */
 data class TailUiState(
     val habits: List<TailHabit> = emptyList(),
@@ -105,16 +93,14 @@ data class TailUiState(
 /**
  * Holds all UI state for [MainActivity].
  *
- * On init it loads the last saved settings from [AppSettingsRepository] and
- * fetches the list of connected Wear OS nodes via [WearSyncManager].
- *
- * Every public `update*` function persists the change locally **and** pushes
- * the full settings snapshot to the Wearable Data Layer.
+ * Night vibes are plain phone notifications mirrored to whatever wearable is
+ * paired (e.g. a Garmin watch) — no wearable-specific code. Every settings
+ * change persists locally and re-arms the [NightVibeScheduler] alarm chain.
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repo = AppSettingsRepository(application)
-    private val syncManager = WearSyncManager(application)
+    private val nightLogRepo = NightVibeLogRepository(application)
     private val adviceRepo = AdviceRepository(application)
     private val triggerRepo = RealityCheckRepository(application)
     private val statsRepo = RealityCheckStatsRepository(application)
@@ -123,14 +109,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── UI state ─────────────────────────────────────────────────────────────
 
-    private val _settings = MutableStateFlow(VibeSettings())
-    val settings: StateFlow<VibeSettings> = _settings.asStateFlow()
+    private val _settings = MutableStateFlow(NightVibeSettings())
+    val settings: StateFlow<NightVibeSettings> = _settings.asStateFlow()
 
-    private val _nodes = MutableStateFlow<List<Node>>(emptyList())
-    val nodes: StateFlow<List<Node>> = _nodes.asStateFlow()
-
-    private val _syncStatus = MutableStateFlow(SyncStatus())
-    val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
+    /** Epoch-ms timestamps of every night-vibe notification sent (oldest → newest). */
+    val nightVibeLog: StateFlow<List<Long>> = nightLogRepo.sentTimesFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
 
     /** `"day"` or `"night"` — persisted in DataStore. */
     private val _activeMode = MutableStateFlow("day")
@@ -176,13 +164,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList(),
         )
 
-    val presets: StateFlow<List<Preset>> = repo.presetsFlow
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = emptyList(),
-        )
-
     // ── Reality check daily log & stats state ──────────────────────────────────
 
     /** All day logs, oldest → newest. */
@@ -212,7 +193,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
 
     /**
-     * Live countdown text derived from [VibeSettings.snoozeUntilTimestamp].
+     * Live countdown text derived from [NightVibeSettings.snoozeUntilTimestamp].
      * Emits "Snoozed — X min Y sec remaining" while snoozed, null otherwise.
      * Ticks every second.
      */
@@ -243,7 +224,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _settings.value = repo.settingsFlow.first()
             _autoSwitchDayOnHabit.value = repo.autoSwitchDayOnHabitFlow.first()
         }
-        refreshNodes()
         // Observe advice for both sections
         AdviceSection.all.forEach { section ->
             viewModelScope.launch {
@@ -282,9 +262,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             delay(700)
             randomizeTechnique()
         }
-        // Ensure notification channel exists and schedule daily trigger alarm
+        // Ensure notification channels exist and schedule daily trigger alarm
         NotificationHelper.ensureChannel(application)
+        NightVibeNotifier.ensureChannel(application)
         DailyTriggerScheduler.schedule(application)
+        // Arm the night-vibe chain and keep it in sync with any settings change
+        // (including snoozes made from other entry points).
+        viewModelScope.launch {
+            NightVibeScheduler.scheduleNext(application)
+            repo.settingsFlow.collect { saved ->
+                _settings.value = saved
+                runCatching { NightVibeScheduler.scheduleNext(application) }
+            }
+        }
         // Make sure today's reality check exists the moment the app opens,
         // and arm the (adaptive) nag cycle if today's goals are unmet.
         viewModelScope.launch {
@@ -299,95 +289,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ── Public API ───────────────────────────────────────────────────────────
+    // ── Night vibes API ──────────────────────────────────────────────────────
 
-    /** Re-queries the Wearable Node Client for currently connected watches. */
-    fun refreshNodes() {
-        viewModelScope.launch {
-            _nodes.value = syncManager.getConnectedNodes()
-        }
-    }
+    fun updateIsEnabled(enabled: Boolean) = updateSettings(_settings.value.copy(isEnabled = enabled))
 
-    fun updateIsEnabled(enabled: Boolean) = updateAndSync(_settings.value.copy(isEnabled = enabled))
+    fun updateNightStart(minutesOfDay: Int) =
+        updateSettings(_settings.value.copy(nightStartMinutes = minutesOfDay))
 
-    fun updateFreqMin(minutes: Int) {
-        val clamped = minutes.coerceAtMost(_settings.value.freqMaxMinutes)
-        updateAndSync(_settings.value.copy(freqMinMinutes = clamped))
-    }
+    fun updateGapMinutes(minutes: Int) =
+        updateSettings(_settings.value.copy(gapMinutes = minutes))
 
-    fun updateFreqMax(minutes: Int) {
-        val clamped = minutes.coerceAtLeast(_settings.value.freqMinMinutes)
-        updateAndSync(_settings.value.copy(freqMaxMinutes = clamped))
-    }
+    fun updateRemInterval(minutes: Int) =
+        updateSettings(_settings.value.copy(remIntervalMinutes = minutes))
 
-    fun updateIntensity(intensity: Int) =
-        updateAndSync(_settings.value.copy(vibrationIntensity = intensity))
-
-    fun updateVibrationDurationMs(ms: Long) =
-        updateAndSync(_settings.value.copy(vibrationDurationMs = ms))
-
-    fun updateVibrationPatternType(type: String) =
-        updateAndSync(_settings.value.copy(vibrationPatternType = type))
-
-    fun updateVibrationRepeatCount(count: Int) =
-        updateAndSync(_settings.value.copy(vibrationRepeatCount = count))
-
-    /**
-     * Sends an immediate vibrate command to the target node(s) via MessageClient.
-     * Uses the currently configured intensity and pattern settings.
-     */
-    fun vibrateNow() {
-        val targetNodeId = _settings.value.targetNodeId
-        Log.d(TAG, "vibrateNow: called — targetNodeId='$targetNodeId'")
-        viewModelScope.launch {
-            if (targetNodeId == VibeConstants.VALUE_TARGET_NODE_ALL) {
-                Log.d(TAG, "vibrateNow: target is ALL — querying connected nodes…")
-                val nodes = syncManager.getConnectedNodes()
-                Log.d(TAG, "vibrateNow: found ${nodes.size} node(s) to send vibrate-now")
-                nodes.forEach { node ->
-                    Log.d(TAG, "vibrateNow: sending to node id='${node.id}', displayName='${node.displayName}'")
-                    syncManager.sendVibrateNow(node.id)
-                }
-            } else {
-                Log.d(TAG, "vibrateNow: sending to specific node '$targetNodeId'")
-                syncManager.sendVibrateNow(targetNodeId)
-            }
-        }
+    /** Posts a test night-vibe notification immediately (not written to the log). */
+    fun testNightVibe() {
+        NightVibeNotifier.show(getApplication())
     }
 
     /**
-     * Sets [VibeSettings.snoozeUntilTimestamp] to [System.currentTimeMillis] + [durationMs].
+     * Sets [NightVibeSettings.snoozeUntilTimestamp] to [System.currentTimeMillis] + [durationMs].
      */
     fun snooze(durationMs: Long) {
         val until = System.currentTimeMillis() + durationMs
-        updateAndSync(_settings.value.copy(snoozeUntilTimestamp = until))
+        updateSettings(_settings.value.copy(snoozeUntilTimestamp = until))
     }
 
-    /** Cancels any active snooze by resetting [VibeSettings.snoozeUntilTimestamp] to 0. */
+    /** Cancels any active snooze by resetting [NightVibeSettings.snoozeUntilTimestamp] to 0. */
     fun cancelSnooze() {
-        updateAndSync(_settings.value.copy(snoozeUntilTimestamp = 0L))
+        updateSettings(_settings.value.copy(snoozeUntilTimestamp = 0L))
     }
 
     /** Adds a custom snooze duration (in ms) if not already present. */
     fun addCustomSnoozeDuration(durationMs: Long) {
         val current = _settings.value.customSnoozeDurations
         if (durationMs !in current) {
-            updateAndSync(_settings.value.copy(customSnoozeDurations = current + durationMs))
+            updateSettings(_settings.value.copy(customSnoozeDurations = current + durationMs))
         }
     }
 
     /** Removes a custom snooze duration (in ms). */
     fun removeCustomSnoozeDuration(durationMs: Long) {
         val updated = _settings.value.customSnoozeDurations.filter { it != durationMs }
-        updateAndSync(_settings.value.copy(customSnoozeDurations = updated))
+        updateSettings(_settings.value.copy(customSnoozeDurations = updated))
     }
-
-    /**
-     * Sets the active watch by Node ID.
-     * Pass [com.example.vild.shared.VibeConstants.VALUE_TARGET_NODE_ALL] to target all nodes.
-     */
-    fun updateTargetNode(nodeId: String) =
-        updateAndSync(_settings.value.copy(targetNodeId = nodeId))
 
     // ── Day/Night mode API ───────────────────────────────────────────────────
 
@@ -396,7 +341,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 1. Saves current settings under the outgoing mode.
      * 2. Switches [activeMode] to the other mode.
      * 3. Loads the incoming mode's settings.
-     * 4. Updates [_settings] and syncs to the watch.
+     * 4. Updates [_settings] and re-arms the night-vibe chain.
      */
     fun toggleMode() {
         viewModelScope.launch {
@@ -410,9 +355,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repo.setActiveMode(incoming)
             _activeMode.value = incoming
 
-            // Load the incoming mode's settings and sync
+            // Load the incoming mode's settings and re-arm
             val incomingSettings = repo.loadModeSettings(incoming)
-            updateAndSync(incomingSettings)
+            updateSettings(incomingSettings)
 
             // Randomize advice for the incoming mode
             randomizeAdvice(incoming)
@@ -425,51 +370,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setAutoSwitchDayOnHabit(enabled: Boolean) {
         _autoSwitchDayOnHabit.value = enabled
         viewModelScope.launch { repo.setAutoSwitchDayOnHabit(enabled) }
-    }
-
-    // ── Preset API ───────────────────────────────────────────────────────────
-
-    /** Saves the current vibration/scheduling settings as a named preset. */
-    fun saveCurrentAsPreset(name: String) {
-        val s = _settings.value
-        val preset = Preset(
-            name = name,
-            isEnabled = s.isEnabled,
-            freqMinMinutes = s.freqMinMinutes,
-            freqMaxMinutes = s.freqMaxMinutes,
-            vibrationIntensity = s.vibrationIntensity,
-            vibrationDurationMs = s.vibrationDurationMs,
-            vibrationPatternType = s.vibrationPatternType,
-            vibrationRepeatCount = s.vibrationRepeatCount,
-        )
-        viewModelScope.launch { repo.savePreset(preset) }
-    }
-
-    /**
-     * Applies a preset's settings to the currently active mode and syncs to the watch.
-     * The loaded settings are also persisted under the active mode's DataStore key so
-     * toggling away and back restores the preset values.
-     */
-    fun loadPreset(preset: Preset) {
-        val newSettings = _settings.value.copy(
-            isEnabled = preset.isEnabled,
-            freqMinMinutes = preset.freqMinMinutes,
-            freqMaxMinutes = preset.freqMaxMinutes,
-            vibrationIntensity = preset.vibrationIntensity,
-            vibrationDurationMs = preset.vibrationDurationMs,
-            vibrationPatternType = preset.vibrationPatternType,
-            vibrationRepeatCount = preset.vibrationRepeatCount,
-        )
-        updateAndSync(newSettings)
-        // Also persist under the active mode so toggling away and back restores it
-        viewModelScope.launch {
-            repo.saveModeSettings(_activeMode.value, newSettings)
-        }
-    }
-
-    /** Deletes a preset by name. */
-    fun deletePreset(name: String) {
-        viewModelScope.launch { repo.deletePreset(name) }
     }
 
     // ── Advice API ────────────────────────────────────────────────────────────
@@ -737,15 +637,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun dateKey(epochDay: Long): String =
         java.time.LocalDate.ofEpochDay(epochDay).toString()
 
-    private fun updateAndSync(newSettings: VibeSettings) {
+    private fun updateSettings(newSettings: NightVibeSettings) {
         _settings.value = newSettings
         viewModelScope.launch {
             repo.save(newSettings)
-            val success = syncManager.pushSettings(newSettings)
-            _syncStatus.value = SyncStatus(
-                lastSyncTimestamp = System.currentTimeMillis(),
-                lastSyncSuccess = success,
-            )
+            // repo.settingsFlow collector in init re-arms the scheduler.
         }
     }
 }

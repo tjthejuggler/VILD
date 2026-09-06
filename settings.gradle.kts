@@ -21,6 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "VILD"
 include(":app")
-include(":wear")
-include(":shared")
  

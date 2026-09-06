@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.example.vild.data.DailyTriggerScheduler
 import com.example.vild.data.NagScheduler
+import com.example.vild.data.NightVibeScheduler
 import com.example.vild.data.RealityCheckStatsRepository
 import com.example.vild.data.todayEpochDay
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +34,12 @@ class BootReceiver : BroadcastReceiver() {
 
         val pendingResult = goAsync()
         val appContext = context.applicationContext
+
+        // Re-arm the night-vibe chain (no-op / disarm if the feature is off).
+        scope.launch {
+            runCatching { NightVibeScheduler.scheduleNext(appContext) }
+                .onFailure { Log.e(TAG, "Night vibe re-arm failed: ${it.message}", it) }
+        }
 
         scope.launch {
             try {

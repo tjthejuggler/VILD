@@ -50,12 +50,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    // Shared constants (Data Layer paths & keys)
-    implementation(project(":shared"))
-    // Wearable Data Layer API
-    implementation(libs.play.services.wearable)
-    // Coroutines support for GMS Tasks (enables .await() on Task<T>)
-    implementation(libs.kotlinx.coroutines.play.services)
     // DataStore for local settings persistence
     implementation(libs.androidx.datastore.preferences)
     // ViewModel + Compose integration

@@ -21,14 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.vild.MainViewModel
-import com.example.vild.data.VibeSettings
+import com.example.vild.data.NightVibeSettings
 
 /**
  * Snooze section: live countdown, default snooze buttons (15/30/60 min),
  * custom snooze buttons with delete, and an "Add custom" dialog.
  */
 @Composable
-fun SnoozeSection(settings: VibeSettings, vm: MainViewModel) {
+fun SnoozeSection(settings: NightVibeSettings, vm: MainViewModel) {
     val countdownText by vm.snoozeCountdownText.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 

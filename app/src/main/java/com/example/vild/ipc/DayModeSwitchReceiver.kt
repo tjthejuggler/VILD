@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.example.vild.data.AppSettingsRepository
-import com.example.vild.data.WearSyncManager
+import com.example.vild.data.NightVibeScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,7 +22,7 @@ private const val TAG = "DayModeSwitchReceiver"
  * 1. Saves the current night-mode settings.
  * 2. Switches the active mode to "day".
  * 3. Loads the day-mode settings.
- * 4. Pushes the day-mode settings to the watch via [WearSyncManager].
+ * 4. Re-arms the night-vibe chain with the day-mode settings.
  *
  * This works even when VILD's UI is not open because manifest-registered
  * receivers are woken by the system.
@@ -42,7 +42,6 @@ class DayModeSwitchReceiver : BroadcastReceiver() {
         scope.launch {
             try {
                 val repo = AppSettingsRepository(appContext)
-                val syncManager = WearSyncManager(appContext)
 
                 // Check if the feature is enabled
                 val enabled = repo.autoSwitchDayOnHabitFlow.first()
@@ -65,12 +64,12 @@ class DayModeSwitchReceiver : BroadcastReceiver() {
                 // Switch to day mode
                 repo.setActiveMode("day")
 
-                // Load day settings and push to watch
+                // Load day settings, persist them, and re-arm the night-vibe chain
                 val daySettings = repo.loadModeSettings("day")
                 repo.save(daySettings)
-                val success = syncManager.pushSettings(daySettings)
+                NightVibeScheduler.scheduleNext(appContext)
 
-                Log.i(TAG, "Switched from night → day mode (push success=$success)")
+                Log.i(TAG, "Switched from night → day mode")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to auto-switch to day mode: ${e.message}", e)
             } finally {

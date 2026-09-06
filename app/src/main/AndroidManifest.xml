@@ -87,6 +87,15 @@
         </receiver>
 
         <!--
+            BroadcastReceiver: drives the night-vibe alarm chain. Posts the
+            transient REM-aimed notification (mirrored + vibrated by the
+            paired watch), records the send time, and re-arms itself.
+        -->
+        <receiver
+            android:name=".ipc.NightVibeReceiver"
+            android:exported="false" />
+
+        <!--
             BroadcastReceiver: re-posts the reality check notification every
             30 minutes until the user confirms they have read AND done it.
         -->

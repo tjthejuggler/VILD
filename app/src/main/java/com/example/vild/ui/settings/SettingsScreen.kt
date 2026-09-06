@@ -13,17 +13,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -39,11 +35,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.vild.MainViewModel
 import com.example.vild.data.AdviceItem
+import com.example.vild.data.NightVibeSettings
 import com.example.vild.data.RealityCheckTrigger
-import com.example.vild.shared.VibeConstants
-import com.example.vild.ui.PresetSection
 import com.example.vild.ui.SnoozeSection
-import com.example.vild.ui.VibrationSection
 import com.example.vild.ui.advice.AdviceDialog
 import com.example.vild.ui.advice.AdviceSection
 import com.example.vild.ui.dream.DreamBackground
@@ -55,20 +49,31 @@ import com.example.vild.ui.theme.AuroraTeal
 import com.example.vild.ui.theme.Mist
 import com.example.vild.ui.theme.MoonLavender
 import com.example.vild.ui.theme.Void
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+
+private val nightTimeFormat = DateTimeFormatter.ofPattern("HH:mm")
+
+/** Formats minutes-of-day as HH:mm. */
+private fun formatMinutesOfDay(minutes: Int): String =
+    LocalTime.of(minutes / 60, minutes % 60).format(nightTimeFormat)
 
 /**
  * Secondary settings screen — everything that supports the practice but is
- * not the practice itself: watch vibration tuning, presets, snooze, advice
- * and reality check trigger management. Floats in glass over the dream sky.
+ * not the practice itself: night vibes, snooze, advice and reality check
+ * trigger management. Floats in glass over the dream sky.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     vm: MainViewModel,
     onBack: () -> Unit,
 ) {
     val settings by vm.settings.collectAsState()
-    val nodes by vm.nodes.collectAsState()
+    val nightLog by vm.nightVibeLog.collectAsState()
     val adviceState by vm.adviceState.collectAsState()
     val triggers by vm.triggers.collectAsState()
     val techniqueState by vm.techniqueState.collectAsState()
@@ -114,7 +119,7 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Vibration & Watch (moved from the old main screen) ─────────────
+            // ── Night vibes ─────────────────────────────────────────────────────
             item {
                 GlassCard {
                     Column(
@@ -124,13 +129,15 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
-                            "VIBRATION & WATCH",
+                            "NIGHT VIBES",
                             style = MaterialTheme.typography.labelMedium,
                             color = Mist,
                         )
                         Text(
-                            "The watch buzzes as a secondary reminder. The reality check " +
-                                "itself lives on the main screen.",
+                            "Your paired watch vibrates when these notifications arrive — " +
+                                "no watch app needed. A quiet gap covers the first part of " +
+                                "the night; after that one pulse is sent per sleep cycle, " +
+                                "aimed at REM.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Mist,
                         )
@@ -143,7 +150,7 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                "Enable vibration reminders",
+                                "Enable night vibes",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MoonLavender,
                             )
@@ -157,61 +164,61 @@ fun SettingsScreen(
                             )
                         }
 
-                        NodeSelector(
-                            nodes = nodes.map { it.id to it.displayName },
-                            selectedNodeId = settings.targetNodeId,
-                            onNodeSelected = { vm.updateTargetNode(it) },
-                            onRefresh = { vm.refreshNodes() },
+                        Text(
+                            "Night starts · ${formatMinutesOfDay(settings.nightStartMinutes)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Mist,
+                        )
+                        Slider(
+                            value = settings.nightStartMinutes.toFloat(),
+                            onValueChange = { vm.updateNightStart(it.toInt()) },
+                            valueRange = 18 * 60f..24 * 60f - 15f,
+                            modifier = Modifier.fillMaxWidth(),
                         )
 
                         Text(
-                            "Reminder frequency",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MoonLavender,
-                        )
-                        Text(
-                            "Min interval: ${settings.freqMinMinutes} min",
+                            "Quiet gap · ${settings.gapMinutes / 60}h ${settings.gapMinutes % 60}m" +
+                                " (no pulses after night starts)",
                             style = MaterialTheme.typography.bodySmall,
                             color = Mist,
                         )
                         Slider(
-                            value = settings.freqMinMinutes.toFloat(),
-                            onValueChange = { vm.updateFreqMin(it.toInt()) },
-                            valueRange = 1f..120f,
-                            steps = 118,
+                            value = settings.gapMinutes.toFloat(),
+                            onValueChange = { vm.updateGapMinutes((it.toInt() / 15 * 15)) },
+                            valueRange = 0f..8 * 60f,
                             modifier = Modifier.fillMaxWidth(),
                         )
+
                         Text(
-                            "Max interval: ${settings.freqMaxMinutes} min",
+                            "Sleep cycle length · ${settings.remIntervalMinutes} min " +
+                                "(one pulse per cycle, aimed at REM)",
                             style = MaterialTheme.typography.bodySmall,
                             color = Mist,
                         )
                         Slider(
-                            value = settings.freqMaxMinutes.toFloat(),
-                            onValueChange = { vm.updateFreqMax(it.toInt()) },
-                            valueRange = 1f..120f,
-                            steps = 118,
+                            value = settings.remIntervalMinutes.toFloat(),
+                            onValueChange = { vm.updateRemInterval((it.toInt() / 5 * 5)) },
+                            valueRange = 60f..120f,
                             modifier = Modifier.fillMaxWidth(),
                         )
+
+                        Text(
+                            "The night has no set end — it ends when you leave Night mode " +
+                                "(Tail habit increment or the Day/Night toggle).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Mist,
+                        )
+
+                        OutlinedButton(
+                            onClick = { vm.testNightVibe() },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MoonLavender),
+                        ) {
+                            Text("Send test notification")
+                        }
 
                         HorizontalDivider(color = MoonLavender.copy(alpha = 0.15f))
 
-                        VibrationSection(settings = settings, vm = vm)
-                    }
-                }
-            }
-
-            // ── Presets ─────────────────────────────────────────────────────────
-            item {
-                GlassCard {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text("PRESETS", style = MaterialTheme.typography.labelMedium, color = Mist)
-                        PresetSection(vm = vm)
+                        NightVibeLogSection(settings = settings, sentTimes = nightLog)
                     }
                 }
             }
@@ -486,55 +493,64 @@ fun SettingsScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Shows the recorded night-vibe send times for the most recent nights,
+ * grouped by night (date the night started on).
+ */
 @Composable
-private fun NodeSelector(
-    nodes: List<Pair<String, String>>,
-    selectedNodeId: String,
-    onNodeSelected: (String) -> Unit,
-    onRefresh: () -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
+private fun NightVibeLogSection(settings: NightVibeSettings, sentTimes: List<Long>) {
+    Text(
+        "SENT THIS NIGHT",
+        style = MaterialTheme.typography.labelMedium,
+        color = Mist,
+    )
 
-    val allOption = VibeConstants.VALUE_TARGET_NODE_ALL to "All watches"
-    val options = listOf(allOption) + nodes
+    if (sentTimes.isEmpty()) {
+        Text(
+            "No night vibes sent yet",
+            style = MaterialTheme.typography.bodySmall,
+            color = Mist,
+        )
+        return
+    }
 
-    val selectedLabel = options.firstOrNull { it.first == selectedNodeId }?.second
-        ?: "All watches"
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            OutlinedTextField(
-                value = selectedLabel,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Active watch") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier
-                    .menuAnchor()
-                    .fillMaxWidth(),
-            )
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-            ) {
-                options.forEach { (id, name) ->
-                    DropdownMenuItem(
-                        text = { Text(name) },
-                        onClick = {
-                            onNodeSelected(id)
-                            expanded = false
-                        },
-                    )
-                }
+    // Group send times by the date of the night window start.
+    val zone = ZoneId.systemDefault()
+    val nights = sentTimes
+        .map { ts ->
+            val time = LocalDateTime.ofInstant(Instant.ofEpochMilli(ts), zone)
+            // A time before the (possibly late) night start belongs to the previous night.
+            var nightDate = time.toLocalDate()
+            if (time.toLocalTime() < LocalTime.of(settings.nightStartMinutes / 60, settings.nightStartMinutes % 60)) {
+                nightDate = nightDate.minusDays(1)
             }
+            nightDate to time
         }
-        OutlinedButton(onClick = onRefresh) {
-            Text("Refresh watches")
+        .groupBy({ it.first }, { it.second })
+        .toSortedMap(compareByDescending { it })
+
+    nights.entries.take(3).forEach { (nightDate, times) ->
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    nightDate.let(LocalDate::toString),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MoonLavender,
+                )
+                Text(
+                    "${times.size} pulse${if (times.size != 1) "s" else ""}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AuroraTeal,
+                )
+            }
+            Text(
+                times.joinToString("  ·  ") { it.format(nightTimeFormat) },
+                style = MaterialTheme.typography.bodySmall,
+                color = Mist,
+            )
         }
     }
 }
