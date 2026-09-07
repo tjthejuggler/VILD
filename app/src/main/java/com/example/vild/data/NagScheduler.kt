@@ -73,8 +73,13 @@ object NagScheduler {
     fun schedule(context: Context, intervalMs: Long = INTERVAL_MS) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val at = System.currentTimeMillis() + intervalMs
-        // setAndAllowWhileIdle fires even in Doze — the dream must not be escaped.
-        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pendingIntent(context))
+        // The nag only re-posts a notification — timing precision is irrelevant, so use an
+        // INEXACT, NON-WAKEUP alarm. The OS batches it with other wake-ups instead of waking
+        // the device itself, which keeps Android's "waking the device" / battery accounting
+        // clean. (A wake-up alarm here fired up to ~40x/day and triggered the battery
+        // warning.) If the device is idle the delivery may slip a few minutes, which is
+        // perfectly acceptable for a reminder nudge.
+        alarmManager.set(AlarmManager.RTC, at, pendingIntent(context))
         Log.d(TAG, "Nag armed for +${intervalMs / 60000} min")
     }
 
