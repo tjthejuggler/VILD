@@ -1,7 +1,9 @@
 package com.example.vild
 
 import android.app.Application
+import android.content.Intent
 import android.content.pm.PackageManager
+import com.example.vild.ui.night.NightVibeChartActivity
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +12,7 @@ import com.example.vild.data.AdviceRepository
 import com.example.vild.data.AppSettingsRepository
 import com.example.vild.data.DailyTriggerScheduler
 import com.example.vild.data.NagScheduler
+import com.example.vild.data.NightVibeEntry
 import com.example.vild.data.NightVibeLogRepository
 import com.example.vild.data.NightVibeNotifier
 import com.example.vild.data.NightVibeScheduler
@@ -112,8 +115,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _settings = MutableStateFlow(NightVibeSettings())
     val settings: StateFlow<NightVibeSettings> = _settings.asStateFlow()
 
-    /** Epoch-ms timestamps of every night-vibe notification sent (oldest → newest). */
-    val nightVibeLog: StateFlow<List<Long>> = nightLogRepo.sentTimesFlow
+    /** Every recorded night-vibe pulse, oldest → newest. */
+    val nightVibeLog: StateFlow<List<NightVibeEntry>> = nightLogRepo.entriesFlow
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -305,6 +308,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Posts a test night-vibe notification immediately (not written to the log). */
     fun testNightVibe() {
         NightVibeNotifier.show(getApplication())
+    }
+
+    /** Opens the full-screen landscape chart of night vibes per night. */
+    fun openNightChart() {
+        val app = getApplication<Application>()
+        app.startActivity(
+            Intent(app, NightVibeChartActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+    }
+
+    /** Persists an edited night-vibe entry (noticed / in-dream / woke-me flags). */
+    fun updateNightVibeEntry(entry: NightVibeEntry) {
+        viewModelScope.launch { nightLogRepo.updateEntry(entry) }
     }
 
     /**

@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -35,7 +37,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.vild.MainViewModel
 import com.example.vild.data.AdviceItem
+import com.example.vild.data.NightVibeEntry
 import com.example.vild.data.NightVibeSettings
+import com.example.vild.data.groupNights
+import com.example.vild.ui.theme.StarGold
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Color
 import com.example.vild.data.RealityCheckTrigger
 import com.example.vild.ui.SnoozeSection
 import com.example.vild.ui.advice.AdviceDialog
@@ -218,7 +225,7 @@ fun SettingsScreen(
 
                         HorizontalDivider(color = MoonLavender.copy(alpha = 0.15f))
 
-                        NightVibeLogSection(settings = settings, sentTimes = nightLog)
+                        NightVibeLogSection(settings = settings, entries = nightLog, vm = vm)
                     }
                 }
             }
@@ -494,63 +501,100 @@ fun SettingsScreen(
 }
 
 /**
- * Shows the recorded night-vibe send times for the most recent nights,
- * grouped by night (date the night started on).
+ * Shows the recorded night-vibe pulses for the previous nights, grouped by
+ * the night they belong to (newest first). Each pulse shows its send time and
+ * tap-to-toggle markers: Noticed / In dream / Woke me.
  */
 @Composable
-private fun NightVibeLogSection(settings: NightVibeSettings, sentTimes: List<Long>) {
+private fun NightVibeLogSection(
+    settings: NightVibeSettings,
+    entries: List<NightVibeEntry>,
+    vm: MainViewModel,
+) {
     Text(
-        "SENT THIS NIGHT",
+        "PREVIOUS NIGHTS",
         style = MaterialTheme.typography.labelMedium,
         color = Mist,
     )
 
-    if (sentTimes.isEmpty()) {
+    OutlinedButton(
+        onClick = { vm.openNightChart() },
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MoonLavender),
+    ) {
+        Text("Open night chart")
+    }
+
+    if (entries.isEmpty()) {
         Text(
-            "No night vibes sent yet",
+            "No night vibes recorded yet — they appear here the morning after",
             style = MaterialTheme.typography.bodySmall,
             color = Mist,
         )
         return
     }
 
-    // Group send times by the date of the night window start.
+    val nights = groupNights(entries, settings.nightStartMinutes)
     val zone = ZoneId.systemDefault()
-    val nights = sentTimes
-        .map { ts ->
-            val time = LocalDateTime.ofInstant(Instant.ofEpochMilli(ts), zone)
-            // A time before the (possibly late) night start belongs to the previous night.
-            var nightDate = time.toLocalDate()
-            if (time.toLocalTime() < LocalTime.of(settings.nightStartMinutes / 60, settings.nightStartMinutes % 60)) {
-                nightDate = nightDate.minusDays(1)
-            }
-            nightDate to time
-        }
-        .groupBy({ it.first }, { it.second })
-        .toSortedMap(compareByDescending { it })
 
-    nights.entries.take(3).forEach { (nightDate, times) ->
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    nights.entries.take(3).forEach { (nightDate, nightEntries) ->
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    nightDate.let(LocalDate::toString),
+                    "Night of ${nightDate.let(LocalDate::toString)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MoonLavender,
                 )
                 Text(
-                    "${times.size} pulse${if (times.size != 1) "s" else ""}",
+                    "${nightEntries.size} pulse${if (nightEntries.size != 1) "s" else ""}",
                     style = MaterialTheme.typography.bodySmall,
                     color = AuroraTeal,
                 )
             }
-            Text(
-                times.joinToString("  ·  ") { it.format(nightTimeFormat) },
-                style = MaterialTheme.typography.bodySmall,
-                color = Mist,
-            )
+            nightEntries.forEach { entry ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        Instant.ofEpochMilli(entry.timestampMs).atZone(zone).format(nightTimeFormat),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Mist,
+                        modifier = Modifier.width(44.dp),
+                    )
+                    EntryFlagChip("Noticed", entry.noticed, AuroraTeal) {
+                        vm.updateNightVibeEntry(entry.copy(noticed = it))
+                    }
+                    EntryFlagChip("Dream", entry.inDream, StarGold) {
+                        vm.updateNightVibeEntry(entry.copy(inDream = it))
+                    }
+                    EntryFlagChip("Woke", entry.wokeMeUp, Color(0xFFEF7A7A)) {
+                        vm.updateNightVibeEntry(entry.copy(wokeMeUp = it))
+                    }
+                }
+            }
         }
     }
+}
+
+/** Compact toggle chip for a night-vibe entry marker. */
+@Composable
+private fun EntryFlagChip(
+    label: String,
+    checked: Boolean,
+    activeColor: Color,
+    onToggle: (Boolean) -> Unit,
+) {
+    FilterChip(
+        selected = checked,
+        onClick = { onToggle(!checked) },
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = activeColor.copy(alpha = 0.35f),
+            selectedLabelColor = activeColor,
+        ),
+    )
 }

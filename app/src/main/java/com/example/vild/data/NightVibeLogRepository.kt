@@ -14,33 +14,45 @@ import kotlinx.serialization.json.Json
 private val Context.nightVibeLogDataStore: DataStore<Preferences> by preferencesDataStore(name = "night_vibe_log")
 
 /**
- * Records the epoch-ms timestamps of every night-vibe notification actually
- * sent, so the app can show "at what time notifications were sent throughout
- * the night". Entries older than [MAX_AGE_DAYS] days are pruned on write.
+ * Records every night-vibe notification actually sent ([NightVibeEntry]),
+ * including the user's after-the-fact annotations (noticed / in-dream / woke
+ * me up). Entries older than [MAX_AGE_DAYS] days are pruned on write.
  */
 class NightVibeLogRepository(private val context: Context) {
 
-    private val keySentTimes = stringPreferencesKey("sent_times_json")
+    private val keyEntries = stringPreferencesKey("sent_times_json")
 
-    /** Observe all recorded send timestamps, oldest → newest. */
-    val sentTimesFlow: Flow<List<Long>> = context.nightVibeLogDataStore.data.map { prefs ->
+    /** Observe all recorded entries, oldest → newest. */
+    val entriesFlow: Flow<List<NightVibeEntry>> = context.nightVibeLogDataStore.data.map { prefs ->
         loadAll(prefs)
     }
 
-    /** Appends [timestampMs] and prunes entries older than the retention window. */
+    /** Appends a freshly-sent pulse and prunes entries older than the retention window. */
     suspend fun record(timestampMs: Long) {
         context.nightVibeLogDataStore.edit { prefs ->
             val cutoff = timestampMs - MAX_AGE_DAYS * 24 * 60 * 60_000L
-            val updated = (loadAll(prefs) + timestampMs)
-                .filter { it >= cutoff }
-                .sorted()
-            prefs[keySentTimes] = Json.encodeToString(updated)
+            val updated = (loadAll(prefs) + NightVibeEntry(timestampMs))
+                .filter { it.timestampMs >= cutoff }
+                .sortedBy { it.timestampMs }
+            prefs[keyEntries] = Json.encodeToString(updated)
         }
     }
 
-    private fun loadAll(prefs: Preferences): List<Long> {
-        val json = prefs[keySentTimes] ?: return emptyList()
-        return runCatching { Json.decodeFromString<List<Long>>(json) }.getOrDefault(emptyList())
+    /** Replaces an entry (identified by its timestamp) with [updated]. */
+    suspend fun updateEntry(updated: NightVibeEntry) {
+        context.nightVibeLogDataStore.edit { prefs ->
+            val current = loadAll(prefs)
+            val replaced = current.map {
+                if (it.timestampMs == updated.timestampMs) updated else it
+            }
+            prefs[keyEntries] = Json.encodeToString(replaced)
+        }
+    }
+
+    private fun loadAll(prefs: Preferences): List<NightVibeEntry> {
+        val json = prefs[keyEntries] ?: return emptyList()
+        return runCatching { Json.decodeFromString<List<NightVibeEntry>>(json) }
+            .getOrElse { emptyList() }
     }
 
     private companion object {

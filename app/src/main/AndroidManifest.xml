@@ -42,6 +42,16 @@
         </activity>
 
         <!--
+            Full-screen landscape chart of night vibes per night, with per-pulse
+            noticed / in-dream / woke-me annotations.
+        -->
+        <activity
+            android:name=".ui.night.NightVibeChartActivity"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@style/Theme.VILD" />
+
+        <!--
             BroadcastReceiver: listens for Tail's ACTION_HABIT_INCREMENTED broadcast.
             When the "auto switch to day mode" setting is enabled and VILD is currently
             in night mode, this receiver switches to day mode and pushes settings to
