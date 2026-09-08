@@ -64,9 +64,11 @@ class DayModeSwitchReceiver : BroadcastReceiver() {
                 // Switch to day mode
                 repo.setActiveMode("day")
 
-                // Load day settings, persist them, and re-arm the night-vibe chain
+                // Load day settings and persist them
                 val daySettings = repo.loadModeSettings("day")
                 repo.save(daySettings)
+                // Switching to day = wake-up: pause vibes until the next night starts.
+                NightVibeScheduler.pauseUntilNextNight(appContext)
                 NightVibeScheduler.scheduleNext(appContext)
 
                 Log.i(TAG, "Switched from night → day mode")

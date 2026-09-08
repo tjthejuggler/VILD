@@ -41,23 +41,23 @@ class NightVibeReceiver : BroadcastReceiver() {
 
         scope.launch {
             try {
-                val settingsRepo = AppSettingsRepository(appContext)
-                val settings = settingsRepo.settingsFlow.first()
+                val settings = AppSettingsRepository(appContext).settingsFlow.first()
                 val now = LocalDateTime.now()
 
                 if (!settings.isEnabled) {
                     Log.d(TAG, "Night vibes disabled — disarming")
                     NightVibeScheduler.cancel(appContext)
                 } else {
-                    val inNightMode = settingsRepo.activeModeFlow.first() == "night"
                     val window = NightWindow.resolve(now, settings)
                     val snoozed = settings.snoozeUntilTimestamp > System.currentTimeMillis()
-                    if (window.isInRemPhase(now) && inNightMode && !snoozed) {
-                        Log.d(TAG, "In REM phase — posting night vibe")
-                        NightVibeNotifier.show(appContext)
-                        NightVibeLogRepository(appContext).record(System.currentTimeMillis())
-                    } else {
-                        Log.d(TAG, "Skipped (gap/day-mode/snoozed) — re-arming only")
+                    when {
+                        snoozed -> Log.d(TAG, "Skipped (snoozed) — re-arming only")
+                        !window.isInRemPhase(now) -> Log.d(TAG, "Skipped (inside quiet gap) — re-arming only")
+                        else -> {
+                            Log.d(TAG, "In REM phase — posting night vibe")
+                            NightVibeNotifier.show(appContext)
+                            NightVibeLogRepository(appContext).record(System.currentTimeMillis())
+                        }
                     }
                     NightVibeScheduler.scheduleNext(appContext)
                 }

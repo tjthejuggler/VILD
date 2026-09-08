@@ -66,8 +66,10 @@ object NightVibeScheduler {
     }
 
     /**
-     * Computes the epoch-ms when the next night vibe should fire, or `null` if
-     * the computed time is not in the future.
+     * Computes the ABSOLUTE epoch-ms when the next night vibe should fire, or
+     * `null` if the computed time is not in the future. (Callers must pass the
+     * result straight to [AlarmManager.setAlarmClock] — it is a timestamp,
+     * not a delay.)
      */
     internal fun nextFireMs(settings: NightVibeSettings): Long? {
         val now = LocalDateTime.now()
@@ -93,7 +95,27 @@ object NightVibeScheduler {
             candidate
         }
 
-        return Duration.between(now, effective).toMillis().takeIf { it > 0 }
+        if (effective <= now) return null
+        return effective.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }
+
+    /**
+     * Pauses night vibes until the START of the next night. Called when the
+     * app switches to Day mode (Tail habit increment or manual toggle) — that
+     * is the wake-up signal that ends the night.
+     */
+    suspend fun pauseUntilNextNight(context: Context) {
+        val appContext = context.applicationContext
+        val repo = AppSettingsRepository(appContext)
+        val settings = repo.settingsFlow.first()
+        val nextStart = NightWindow.resolve(LocalDateTime.now(), settings, nextNight = true).start
+        repo.save(
+            settings.copy(
+                snoozeUntilTimestamp = nextStart
+                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            ),
+        )
+        Log.d(TAG, "Night vibes paused until next night start at $nextStart")
     }
 
     private fun pendingIntent(context: Context): PendingIntent {

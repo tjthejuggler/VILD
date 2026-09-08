@@ -1,3 +1,5 @@
-# ADR addendum (2026-09-06): Night has no fixed end time
+# ADR addendum (2026-09-08): Night-vibe alarm bug fix and mode-independent gating
 
-The `morningEndMinutes` setting was removed. The REM phase now extends until the next night starts, and `NightVibeReceiver` only posts while the app's active mode is "night". The night therefore ends when the app leaves night mode — via the Tail "auto switch to Day on habit" broadcast (`DayModeSwitchReceiver`, which re-arms the chain with the day-mode snapshot) or the manual Day/Night toggle. NightWindow.morningEnd is now purely internal (`start + 24h`).
+Bug found via logcat: `NightVibeScheduler.nextFireMs()` returned a *duration*, but `scheduleNext()` passed it to `AlarmManager.setAlarmClock` as an *absolute epoch timestamp*, arming the alarm in 1970 → it fired every ~5 s forever and never sent a real night vibe. Fixed to return absolute epoch-ms; verified on-device (armed for a real future timestamp, loop gone).
+
+Gating change: `NightVibeReceiver` no longer requires activeMode == "night" (the user doesn't reliably toggle Night mode at bedtime). Pulses are sent purely on the time window (quiet gap → REM phase) plus the master enable toggle. The day switch (Tail habit increment via `DayModeSwitchReceiver`, or manual toggle) is still the wake-up signal: it now calls `NightVibeScheduler.pauseUntilNextNight()`, which sets `snoozeUntilTimestamp` to the next night's start, so vibes stop for the day and resume automatically the next night.

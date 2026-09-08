@@ -376,6 +376,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Load the incoming mode's settings and re-arm
             val incomingSettings = repo.loadModeSettings(incoming)
             updateSettings(incomingSettings)
+            if (incoming == "day") {
+                // Toggling to day = wake-up: pause vibes until the next night starts.
+                NightVibeScheduler.pauseUntilNextNight(getApplication())
+            }
 
             // Randomize advice for the incoming mode
             randomizeAdvice(incoming)
