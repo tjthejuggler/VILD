@@ -3,6 +3,7 @@ package com.example.vild.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -10,6 +11,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.time.LocalDate
+import java.time.ZoneId
 
 private val Context.nightVibeLogDataStore: DataStore<Preferences> by preferencesDataStore(name = "night_vibe_log")
 
@@ -21,6 +24,7 @@ private val Context.nightVibeLogDataStore: DataStore<Preferences> by preferences
 class NightVibeLogRepository(private val context: Context) {
 
     private val keyEntries = stringPreferencesKey("sent_times_json")
+    private val keyPollutionPurgeDone = booleanPreferencesKey("pollution_purge_done_v1")
 
     /** Observe all recorded entries, oldest → newest. */
     val entriesFlow: Flow<List<NightVibeEntry>> = context.nightVibeLogDataStore.data.map { prefs ->
@@ -46,6 +50,23 @@ class NightVibeLogRepository(private val context: Context) {
                 if (it.timestampMs == updated.timestampMs) updated else it
             }
             prefs[keyEntries] = Json.encodeToString(replaced)
+        }
+    }
+
+    /**
+     * One-time cleanup for the 2026-09-08/09 scheduler bug that fired vibes all
+     * day long, flooding the log with daytime pulses. Deletes every entry from
+     * those two local dates and sets a flag so the purge never runs twice.
+     */
+    suspend fun purgePollutedDaysOnce() {
+        context.nightVibeLogDataStore.edit { prefs ->
+            if (prefs[keyPollutionPurgeDone] == true) return@edit
+            val zone = ZoneId.systemDefault()
+            val from = LocalDate.of(2026, 9, 8).atStartOfDay(zone).toInstant().toEpochMilli()
+            val to = LocalDate.of(2026, 9, 10).atStartOfDay(zone).toInstant().toEpochMilli()
+            val kept = loadAll(prefs).filter { it.timestampMs < from || it.timestampMs >= to }
+            prefs[keyEntries] = Json.encodeToString(kept)
+            prefs[keyPollutionPurgeDone] = true
         }
     }
 

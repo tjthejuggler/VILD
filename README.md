@@ -1,12 +1,19 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-09-10T07:03 UTC
+> Last updated: 2026-09-10T11:12 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
 
 **The daily reality check is now the heart of the app:** every morning one of your triggers is chosen, shown immediately on the dream-like main screen, and the app *insists* — with an un-dismissable, self-re-posting notification — until you confirm you have both **read** and **done** the check. Streaks and stats are tracked in the Dream Stats screen. Watch vibration remains as a secondary reminder layer, configured on the Settings screen.
 
 ---
+
+### 2026-09-10T11:12 UTC
+- **Night-vibe log cleanup + history UX polish** (follow-up to the all-day-vibes bug fixed at 07:03):
+  - [`app/src/main/java/com/example/vild/data/NightVibeLogRepository.kt`](app/src/main/java/com/example/vild/data/NightVibeLogRepository.kt): Added `purgePollutedDaysOnce()` — a one-time, flag-guarded wipe of every pulse recorded on 2026-09-08 and 2026-09-09 (the days the scheduler bug fired vibes all day), so the history starts fresh. The `pollution_purge_done_v1` DataStore flag ensures it never runs twice.
+  - [`app/src/main/java/com/example/vild/MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt): Calls the purge once in `init`.
+  - [`app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt`](app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt): [`NightVibeLogSection`](app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt:513) now shows only the **last 2 nights** on the settings screen; everything older stays in the log and is reachable via the relabelled "Full history & chart" button ([`NightVibeChartActivity`](app/src/main/java/com/example/vild/ui/night/NightVibeChartActivity.kt:74) keeps the complete history, chart included).
+  - Chip relabel for comfortable fit in both screens: "In dream" → **"Dream"**, "Woke me" → **"Woke"** ([SettingsScreen](app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt:578), [NightVibeChartActivity](app/src/main/java/com/example/vild/ui/night/NightVibeChartActivity.kt:286)). Unnoticed unchanged.
 
 ### 2026-09-10T07:03 UTC
 - **Daytime is now free of "are you dreaming" vibes.** Root cause: [`NightWindow.resolve`](app/src/main/java/com/example/vild/data/NightVibeScheduler.kt) ended the night window a full 24 h after its start, so REM-phase pulses ("Are you dreaming? Look at your hands.") kept firing into the day until the user manually toggled Day mode.

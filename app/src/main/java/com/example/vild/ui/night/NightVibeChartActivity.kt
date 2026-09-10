@@ -268,7 +268,7 @@ private fun LegendSwatch(color: Color, label: String) {
     }
 }
 
-/** One pulse row: time + radio markers (Unnoticed default / In dream / Woke me). */
+/** One pulse row: time + radio markers (Unnoticed default / Dream / Woke). */
 @Composable
 private fun EntryRow(
     entry: NightVibeEntry,
@@ -283,10 +283,10 @@ private fun EntryRow(
             FlagChip("Unnoticed", entry.mark == NightVibeMark.UNNOTICED, Mist) {
                 onChange(entry.withMark(NightVibeMark.UNNOTICED))
             }
-            FlagChip("In dream", entry.mark == NightVibeMark.IN_DREAM, StarGold) {
+            FlagChip("Dream", entry.mark == NightVibeMark.IN_DREAM, StarGold) {
                 onChange(entry.withMark(NightVibeMark.IN_DREAM))
             }
-            FlagChip("Woke me", entry.mark == NightVibeMark.WOKE_ME, Color(0xFFEF7A7A)) {
+            FlagChip("Woke", entry.mark == NightVibeMark.WOKE_ME, Color(0xFFEF7A7A)) {
                 onChange(entry.withMark(NightVibeMark.WOKE_ME))
             }
         }

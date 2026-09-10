@@ -269,6 +269,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         NotificationHelper.ensureChannel(application)
         NightVibeNotifier.ensureChannel(application)
         DailyTriggerScheduler.schedule(application)
+        // One-time cleanup: the 2026-09-08/09 scheduler bug logged vibes all day;
+        // drop those two days so the history starts fresh again.
+        viewModelScope.launch { nightLogRepo.purgePollutedDaysOnce() }
         // Arm the night-vibe chain and keep it in sync with any settings change
         // (including snoozes made from other entry points).
         viewModelScope.launch {

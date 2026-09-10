@@ -1,31 +1,14 @@
-# ADR — Night vibes end at a configured wall-clock time; per-pulse markers are radio buttons
-
-**Date:** 2026-09-10
+# ADR: Night-vibe log pollution cleanup & history surface split (2026-09-10)
 
 ## Context
-Users received "Are you dreaming? Look at your hands." notifications during the daytime.
-Root cause: `NightWindow.resolve` ended the night window a full 24 h after its start
-(`morningEnd = start.plusDays(1)`), so REM-phase pulses kept firing until the user manually
-toggled Day mode. Separately, the per-pulse experience markers (Noticed / In dream / Woke me)
-were independent toggles even though the states are mutually exclusive.
+The 2026-09-08/09 scheduler bug (fixed 2026-09-10T07:03) fired night vibes all day, flooding the `night_vibe_log` DataStore with daytime pulses. The Settings "Previous nights" section showed up to 3 nights inline, and the marker chips ("In dream" / "Woke me") were too wide for a pulse row.
 
 ## Decision
-1. The night window now ends at a user-configurable `NightVibeSettings.nightEndMinutes`
-   (default 08:00, persisted as `night_end_minutes` in DataStore). `NightWindow.resolve`
-   clamps `morningEnd` to this time (handling the midnight wrap) and clamps `gapEnd` to it.
-   Night vibes therefore can never fire after the configured end — daytime notifications
-   are exclusively the daily reality-check trigger (`DailyTriggerReceiver` + `NagScheduler`
-   posting `log.triggerText`).
-2. Per-pulse markers became a radio choice via the `NightVibeMark` enum
-   (`UNNOTICED` default / `IN_DREAM` / `WOKE_ME`) with `mark`/`withMark` helpers.
-   UI (Settings `NightVibeLogSection` and Night-chart `EntryRow`) exposes one-choice chips.
-   The boolean storage (`noticed`/`inDream`/`wokeMeUp`) is unchanged for backward
-   compatibility; legacy `noticed=true` entries read as `IN_DREAM`. The chart's
-   gold "noticed" segment still counts `entry.noticed`.
+1. **One-time data purge**: `NightVibeLogRepository.purgePollutedDaysOnce()` deletes every entry whose timestamp falls on local dates 2026-09-08 or 2026-09-09, guarded by a `pollution_purge_done_v1` boolean DataStore key so it never runs twice. Invoked once from `MainViewModel.init`.
+2. **History surface split**: Settings screen shows only the **last 2 nights**; the complete history stays in the DataStore (14-day retention) and is reachable via the `NightVibeChartActivity` page, relabelled "Full history & chart". No data is ever deleted by the UI split — display-only truncation.
+3. **Chip labels shortened** for comfortable fit in both surfaces: "In dream" → "Dream", "Woke me" → "Woke". `NightVibeMark` enum values and persisted flags are unchanged (labels are UI-only).
 
 ## Consequences
-- The old "night has no set end" behavior is gone; the Day/Night toggle no longer gates
-  whether vibes stop in the morning.
-- `nightEndMinutes` participates in day/night mode snapshots (`saveModeSettings`) since it
-  lives inside `NightVibeSettings`.
-- Existing stored entries need no migration.
+- Users start with a clean history after the bug; older legit history (pre-Sep-8) is preserved.
+- Full historical data remains queryable on the chart page.
+- The purge key remains in DataStore harmlessly; future mass-cleanup needs a new flag version (`_v2`).

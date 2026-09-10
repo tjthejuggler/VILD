@@ -510,9 +510,10 @@ fun SettingsScreen(
 }
 
 /**
- * Shows the recorded night-vibe pulses for the previous nights, grouped by
+ * Shows the recorded night-vibe pulses for the last two nights, grouped by
  * the night they belong to (newest first). Each pulse shows its send time and
- * radio-style markers — exactly one of Unnoticed (default) / In dream / Woke me.
+ * radio-style markers — exactly one of Unnoticed (default) / Dream / Woke.
+ * Older nights remain in the log and are reachable via the full-history page.
  */
 @Composable
 private fun NightVibeLogSection(
@@ -530,7 +531,7 @@ private fun NightVibeLogSection(
         onClick = { vm.openNightChart() },
         colors = ButtonDefaults.outlinedButtonColors(contentColor = MoonLavender),
     ) {
-        Text("Open night chart")
+        Text("Full history & chart")
     }
 
     if (entries.isEmpty()) {
@@ -545,7 +546,7 @@ private fun NightVibeLogSection(
     val nights = groupNights(entries, settings.nightStartMinutes)
     val zone = ZoneId.systemDefault()
 
-    nights.entries.take(3).forEach { (nightDate, nightEntries) ->
+    nights.entries.take(2).forEach { (nightDate, nightEntries) ->
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -579,10 +580,10 @@ private fun NightVibeLogSection(
                     EntryFlagChip("Unnoticed", entry.mark == NightVibeMark.UNNOTICED, Mist) {
                         vm.updateNightVibeEntry(entry.withMark(NightVibeMark.UNNOTICED))
                     }
-                    EntryFlagChip("In dream", entry.mark == NightVibeMark.IN_DREAM, StarGold) {
+                    EntryFlagChip("Dream", entry.mark == NightVibeMark.IN_DREAM, StarGold) {
                         vm.updateNightVibeEntry(entry.withMark(NightVibeMark.IN_DREAM))
                     }
-                    EntryFlagChip("Woke me", entry.mark == NightVibeMark.WOKE_ME, Color(0xFFEF7A7A)) {
+                    EntryFlagChip("Woke", entry.mark == NightVibeMark.WOKE_ME, Color(0xFFEF7A7A)) {
                         vm.updateNightVibeEntry(entry.withMark(NightVibeMark.WOKE_ME))
                     }
                 }
