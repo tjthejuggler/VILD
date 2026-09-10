@@ -38,7 +38,10 @@ import androidx.compose.ui.unit.dp
 import com.example.vild.MainViewModel
 import com.example.vild.data.AdviceItem
 import com.example.vild.data.NightVibeEntry
+import com.example.vild.data.NightVibeMark
 import com.example.vild.data.NightVibeSettings
+import com.example.vild.data.mark
+import com.example.vild.data.withMark
 import com.example.vild.data.groupNights
 import com.example.vild.ui.theme.StarGold
 import androidx.compose.foundation.layout.width
@@ -210,10 +213,16 @@ fun SettingsScreen(
                         )
 
                         Text(
-                            "The night has no set end — it ends when you leave Night mode " +
-                                "(Tail habit increment or the Day/Night toggle).",
+                            "Night ends · ${formatMinutesOfDay(settings.nightEndMinutes)} " +
+                                "(no pulses after this — daytime shows only the trigger of the day)",
                             style = MaterialTheme.typography.bodySmall,
                             color = Mist,
+                        )
+                        Slider(
+                            value = settings.nightEndMinutes.toFloat(),
+                            onValueChange = { vm.updateNightEnd(it.toInt() / 15 * 15) },
+                            valueRange = 60f..12 * 60f,
+                            modifier = Modifier.fillMaxWidth(),
                         )
 
                         OutlinedButton(
@@ -503,7 +512,7 @@ fun SettingsScreen(
 /**
  * Shows the recorded night-vibe pulses for the previous nights, grouped by
  * the night they belong to (newest first). Each pulse shows its send time and
- * tap-to-toggle markers: Noticed / In dream / Woke me.
+ * radio-style markers — exactly one of Unnoticed (default) / In dream / Woke me.
  */
 @Composable
 private fun NightVibeLogSection(
@@ -565,14 +574,16 @@ private fun NightVibeLogSection(
                         color = Mist,
                         modifier = Modifier.width(44.dp),
                     )
-                    EntryFlagChip("Noticed", entry.noticed, AuroraTeal) {
-                        vm.updateNightVibeEntry(entry.copy(noticed = it))
+                    // Radio semantics: exactly one marker per pulse — Unnoticed is
+                    // the default until the user picks one of the other two.
+                    EntryFlagChip("Unnoticed", entry.mark == NightVibeMark.UNNOTICED, Mist) {
+                        vm.updateNightVibeEntry(entry.withMark(NightVibeMark.UNNOTICED))
                     }
-                    EntryFlagChip("Dream", entry.inDream, StarGold) {
-                        vm.updateNightVibeEntry(entry.copy(inDream = it))
+                    EntryFlagChip("In dream", entry.mark == NightVibeMark.IN_DREAM, StarGold) {
+                        vm.updateNightVibeEntry(entry.withMark(NightVibeMark.IN_DREAM))
                     }
-                    EntryFlagChip("Woke", entry.wokeMeUp, Color(0xFFEF7A7A)) {
-                        vm.updateNightVibeEntry(entry.copy(wokeMeUp = it))
+                    EntryFlagChip("Woke me", entry.mark == NightVibeMark.WOKE_ME, Color(0xFFEF7A7A)) {
+                        vm.updateNightVibeEntry(entry.withMark(NightVibeMark.WOKE_ME))
                     }
                 }
             }

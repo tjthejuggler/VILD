@@ -29,6 +29,7 @@ class AppSettingsRepository(private val context: Context) {
     private val keyIsEnabled = booleanPreferencesKey("is_enabled")
     private val keyNightStart = intPreferencesKey("night_start_minutes")
     private val keyGapMinutes = intPreferencesKey("gap_minutes")
+    private val keyNightEnd = intPreferencesKey("night_end_minutes")
     private val keyRemInterval = intPreferencesKey("rem_interval_minutes")
     private val keySnoozeUntil = longPreferencesKey("snooze_until_timestamp")
     private val keyCustomSnoozeDurations = stringPreferencesKey("custom_snooze_durations")
@@ -50,6 +51,7 @@ class AppSettingsRepository(private val context: Context) {
             isEnabled = prefs[keyIsEnabled] ?: false,
             nightStartMinutes = prefs[keyNightStart] ?: 23 * 60,
             gapMinutes = prefs[keyGapMinutes] ?: 240,
+            nightEndMinutes = prefs[keyNightEnd] ?: 480,
             remIntervalMinutes = prefs[keyRemInterval] ?: 90,
             snoozeUntilTimestamp = prefs[keySnoozeUntil] ?: 0L,
             customSnoozeDurations = prefs[keyCustomSnoozeDurations]
@@ -77,6 +79,7 @@ class AppSettingsRepository(private val context: Context) {
             prefs[keyIsEnabled] = settings.isEnabled
             prefs[keyNightStart] = settings.nightStartMinutes
             prefs[keyGapMinutes] = settings.gapMinutes
+            prefs[keyNightEnd] = settings.nightEndMinutes
             prefs[keyRemInterval] = settings.remIntervalMinutes
             prefs[keySnoozeUntil] = settings.snoozeUntilTimestamp
             prefs[keyCustomSnoozeDurations] = settings.customSnoozeDurations.joinToString(",")
@@ -125,10 +128,13 @@ class AppSettingsRepository(private val context: Context) {
  * @property nightStartMinutes    Minutes-of-day when the night window begins (e.g. 23:00 → 1380).
  * @property gapMinutes           Silent gap after [nightStartMinutes] — the first half of the
  *                                night, when REM sleep is sparse. No notifications are sent.
+ * @property nightEndMinutes      Minutes-of-day when the night window ends (e.g. 08:00 → 480).
+ *                                No vibes are sent after this time — the day belongs to the
+ *                                daily reality-check trigger.
  * @property remIntervalMinutes   Estimated sleep-cycle length; after the gap, one notification
  *                                is sent per cycle (aimed at predicted REM sessions).
- *                                The night has no fixed end time — it ends when the app
- *                                leaves night mode (Tail habit increment or manual toggle).
+ *                                The night ends at [nightEndMinutes] — the daytime hours
+ *                                stay free of "are you dreaming" vibes.
  * @property snoozeUntilTimestamp Epoch-ms until which night vibes are paused.
  * @property customSnoozeDurations User-defined snooze durations (ms), phone-UI concern only.
  */
@@ -137,6 +143,8 @@ data class NightVibeSettings(
     val isEnabled: Boolean = false,
     val nightStartMinutes: Int = 23 * 60,
     val gapMinutes: Int = 240,
+    /** Minutes-of-day when the night window ends (e.g. 08:00 → 480). */
+    val nightEndMinutes: Int = 480,
     val remIntervalMinutes: Int = 90,
     val snoozeUntilTimestamp: Long = 0L,
     /** Stored as comma-separated string in DataStore; phone-UI concern only. */

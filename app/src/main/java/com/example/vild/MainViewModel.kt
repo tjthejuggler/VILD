@@ -299,6 +299,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateNightStart(minutesOfDay: Int) =
         updateSettings(_settings.value.copy(nightStartMinutes = minutesOfDay))
 
+    fun updateNightEnd(minutesOfDay: Int) =
+        updateSettings(_settings.value.copy(nightEndMinutes = minutesOfDay))
+
     fun updateGapMinutes(minutes: Int) =
         updateSettings(_settings.value.copy(gapMinutes = minutes))
 

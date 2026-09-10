@@ -45,7 +45,10 @@ import androidx.lifecycle.lifecycleScope
 import com.example.vild.data.AppSettingsRepository
 import com.example.vild.data.NightVibeEntry
 import com.example.vild.data.NightVibeLogRepository
+import com.example.vild.data.NightVibeMark
 import com.example.vild.data.groupNights
+import com.example.vild.data.mark
+import com.example.vild.data.withMark
 import com.example.vild.ui.theme.AuroraTeal
 import com.example.vild.ui.theme.Mist
 import com.example.vild.ui.theme.MoonLavender
@@ -65,8 +68,8 @@ private val nightLabelFormat = DateTimeFormatter.ofPattern("MM/dd")
 /**
  * Full-screen landscape chart of night vibes: one bar per night (height =
  * pulses sent, gold overlay = pulses noticed), newest on the right. Tapping a
- * bar reveals that night's pulses with their times and lets the user mark
- * whether a pulse was noticed, noticed inside a dream, or woke them up.
+ * bar reveals that night's pulses with their times and a radio choice of
+ * Unnoticed (default) / In dream / Woke me — exactly one per pulse.
  */
 class NightVibeChartActivity : ComponentActivity() {
 
@@ -265,7 +268,7 @@ private fun LegendSwatch(color: Color, label: String) {
     }
 }
 
-/** One pulse row: time + Noticed / In dream / Woke me toggles. */
+/** One pulse row: time + radio markers (Unnoticed default / In dream / Woke me). */
 @Composable
 private fun EntryRow(
     entry: NightVibeEntry,
@@ -276,9 +279,16 @@ private fun EntryRow(
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(time, style = MaterialTheme.typography.titleSmall, color = MoonLavender)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FlagChip("Noticed", entry.noticed, AuroraTeal) { onChange(entry.copy(noticed = it)) }
-            FlagChip("In dream", entry.inDream, StarGold) { onChange(entry.copy(inDream = it)) }
-            FlagChip("Woke me", entry.wokeMeUp, Color(0xFFEF7A7A)) { onChange(entry.copy(wokeMeUp = it)) }
+            // Exactly one marker per pulse — Unnoticed until the user picks another.
+            FlagChip("Unnoticed", entry.mark == NightVibeMark.UNNOTICED, Mist) {
+                onChange(entry.withMark(NightVibeMark.UNNOTICED))
+            }
+            FlagChip("In dream", entry.mark == NightVibeMark.IN_DREAM, StarGold) {
+                onChange(entry.withMark(NightVibeMark.IN_DREAM))
+            }
+            FlagChip("Woke me", entry.mark == NightVibeMark.WOKE_ME, Color(0xFFEF7A7A)) {
+                onChange(entry.withMark(NightVibeMark.WOKE_ME))
+            }
         }
     }
 }

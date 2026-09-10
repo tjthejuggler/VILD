@@ -21,10 +21,8 @@ import kotlinx.coroutines.flow.first
  *    nothing is sent (early night, little REM sleep).
  * 2. **REM phase** — from the end of the gap onwards, one notification per estimated
  *    sleep cycle ([NightVibeSettings.remIntervalMinutes]), aiming at predicted REM
- *    sessions. There is no fixed end time: the night ends when the app leaves night
- *    mode (Tail habit increment via [com.example.vild.ipc.DayModeSwitchReceiver], or
- *    the manual Day/Night toggle). [NightVibeReceiver] only posts while night mode
- *    is active.
+ *    sessions. The night ends at [NightVibeSettings.nightEndMinutes]: after that the
+ *    day belongs to the daily reality-check trigger, never to night vibes.
  *
  * [NightVibeReceiver] re-arms itself on every fire with a freshly computed time.
  */
@@ -78,7 +76,7 @@ object NightVibeScheduler {
         val candidate = when {
             // Still inside the gap → fire at gap end (first REM-aimed vibe).
             now < window.gapEnd -> window.gapEnd
-            // REM phase (until the next night starts) → next vibe one cycle later.
+            // REM phase (until the night ends) → next vibe one cycle later.
             now < window.morningEnd -> now.plusMinutes(settings.remIntervalMinutes.toLong())
             // Exactly at the next night's start → that night's gap end.
             else -> NightWindow.resolve(now, settings, nextNight = true).gapEnd
@@ -146,7 +144,8 @@ data class NightWindow(
     companion object {
         /**
          * Resolves the window for the night starting at (or most recently before) [now].
-         * The window extends a full 24 h — until the next night starts. With
+         * The window ends at [NightVibeSettings.nightEndMinutes] (wrapping past midnight
+         * when needed) — never a full 24 h, so vibes can never leak into the day. With
          * [nextNight] = true, resolves the following night's window instead.
          */
         fun resolve(now: LocalDateTime, settings: NightVibeSettings, nextNight: Boolean = false): NightWindow {
@@ -156,10 +155,15 @@ data class NightWindow(
             // the relevant night began yesterday.
             val start = (if (startCandidate <= now) startCandidate else startCandidate.minusDays(1))
                 .let { if (nextNight) it.plusDays(1) else it }
+            // End of the night: same day when the end time is after the start,
+            // next day when the window wraps midnight (e.g. 23:00 → 08:00).
+            val endCandidate = start.toLocalDate()
+                .atTime(LocalTime.of(settings.nightEndMinutes / 60, settings.nightEndMinutes % 60))
+            val morningEnd = if (endCandidate > start) endCandidate else endCandidate.plusDays(1)
             return NightWindow(
                 start = start,
-                gapEnd = start.plusMinutes(settings.gapMinutes.toLong()),
-                morningEnd = start.plusDays(1),
+                gapEnd = minOf(start.plusMinutes(settings.gapMinutes.toLong()), morningEnd),
+                morningEnd = morningEnd,
             )
         }
     }

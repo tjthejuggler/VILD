@@ -1,12 +1,20 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-08-22T12:06 UTC
+> Last updated: 2026-09-10T07:03 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
 
 **The daily reality check is now the heart of the app:** every morning one of your triggers is chosen, shown immediately on the dream-like main screen, and the app *insists* — with an un-dismissable, self-re-posting notification — until you confirm you have both **read** and **done** the check. Streaks and stats are tracked in the Dream Stats screen. Watch vibration remains as a secondary reminder layer, configured on the Settings screen.
 
 ---
+
+### 2026-09-10T07:03 UTC
+- **Daytime is now free of "are you dreaming" vibes.** Root cause: [`NightWindow.resolve`](app/src/main/java/com/example/vild/data/NightVibeScheduler.kt) ended the night window a full 24 h after its start, so REM-phase pulses ("Are you dreaming? Look at your hands.") kept firing into the day until the user manually toggled Day mode.
+  - [`app/src/main/java/com/example/vild/data/AppSettingsRepository.kt`](app/src/main/java/com/example/vild/data/AppSettingsRepository.kt): Added `nightEndMinutes` to [`NightVibeSettings`](app/src/main/java/com/example/vild/data/AppSettingsRepository.kt:136) (default 08:00), persisted as `night_end_minutes`.
+  - [`app/src/main/java/com/example/vild/data/NightVibeScheduler.kt`](app/src/main/java/com/example/vild/data/NightVibeScheduler.kt): [`NightWindow.resolve`](app/src/main/java/com/example/vild/data/NightVibeScheduler.kt:152) now ends the night at `nightEndMinutes` (handles the midnight wrap; `gapEnd` clamped to the new end), so vibrations can never leak into daytime. The daytime notifications show only the **trigger of the day** (unchanged: [`DailyTriggerReceiver`](app/src/main/java/com/example/vild/ipc/DailyTriggerReceiver.kt) + adaptive [`NagScheduler`](app/src/main/java/com/example/vild/data/NagScheduler.kt) posting `log.triggerText`).
+  - [`app/src/main/java/com/example/vild/MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt): Added `updateNightEnd()`.
+  - [`app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt`](app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt): "Night ends" slider (01:00–12:00, 15-min steps, default 08:00) replaces the "no set end" note.
+  - **Per-pulse markers are now radio buttons:** new [`NightVibeMark`](app/src/main/java/com/example/vild/data/NightVibeEntry.kt) enum (`UNNOTICED` / `IN_DREAM` / `WOKE_ME`) with `mark` / `withMark` helpers enforcing exactly one choice per pulse. "Unnoticed" is the default. Both [`NightVibeLogSection`](app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt:508) (Settings) and [`EntryRow`](app/src/main/java/com/example/vild/ui/night/NightVibeChartActivity.kt:269) (Night chart) use the new radio chips; legacy entries with only `noticed=true` read as "In dream". Chart gold-segment logic (`entry.noticed`) unchanged.
 
 ## Project Structure
 

@@ -1,5 +1,31 @@
-# ADR addendum (2026-09-08): Night-vibe alarm bug fix and mode-independent gating
+# ADR — Night vibes end at a configured wall-clock time; per-pulse markers are radio buttons
 
-Bug found via logcat: `NightVibeScheduler.nextFireMs()` returned a *duration*, but `scheduleNext()` passed it to `AlarmManager.setAlarmClock` as an *absolute epoch timestamp*, arming the alarm in 1970 → it fired every ~5 s forever and never sent a real night vibe. Fixed to return absolute epoch-ms; verified on-device (armed for a real future timestamp, loop gone).
+**Date:** 2026-09-10
 
-Gating change: `NightVibeReceiver` no longer requires activeMode == "night" (the user doesn't reliably toggle Night mode at bedtime). Pulses are sent purely on the time window (quiet gap → REM phase) plus the master enable toggle. The day switch (Tail habit increment via `DayModeSwitchReceiver`, or manual toggle) is still the wake-up signal: it now calls `NightVibeScheduler.pauseUntilNextNight()`, which sets `snoozeUntilTimestamp` to the next night's start, so vibes stop for the day and resume automatically the next night.
+## Context
+Users received "Are you dreaming? Look at your hands." notifications during the daytime.
+Root cause: `NightWindow.resolve` ended the night window a full 24 h after its start
+(`morningEnd = start.plusDays(1)`), so REM-phase pulses kept firing until the user manually
+toggled Day mode. Separately, the per-pulse experience markers (Noticed / In dream / Woke me)
+were independent toggles even though the states are mutually exclusive.
+
+## Decision
+1. The night window now ends at a user-configurable `NightVibeSettings.nightEndMinutes`
+   (default 08:00, persisted as `night_end_minutes` in DataStore). `NightWindow.resolve`
+   clamps `morningEnd` to this time (handling the midnight wrap) and clamps `gapEnd` to it.
+   Night vibes therefore can never fire after the configured end — daytime notifications
+   are exclusively the daily reality-check trigger (`DailyTriggerReceiver` + `NagScheduler`
+   posting `log.triggerText`).
+2. Per-pulse markers became a radio choice via the `NightVibeMark` enum
+   (`UNNOTICED` default / `IN_DREAM` / `WOKE_ME`) with `mark`/`withMark` helpers.
+   UI (Settings `NightVibeLogSection` and Night-chart `EntryRow`) exposes one-choice chips.
+   The boolean storage (`noticed`/`inDream`/`wokeMeUp`) is unchanged for backward
+   compatibility; legacy `noticed=true` entries read as `IN_DREAM`. The chart's
+   gold "noticed" segment still counts `entry.noticed`.
+
+## Consequences
+- The old "night has no set end" behavior is gone; the Day/Night toggle no longer gates
+  whether vibes stop in the morning.
+- `nightEndMinutes` participates in day/night mode snapshots (`saveModeSettings`) since it
+  lives inside `NightVibeSettings`.
+- Existing stored entries need no migration.
