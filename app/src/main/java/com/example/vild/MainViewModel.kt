@@ -12,11 +12,13 @@ import com.example.vild.data.AdviceRepository
 import com.example.vild.data.AppSettingsRepository
 import com.example.vild.data.DailyTriggerScheduler
 import com.example.vild.data.NagScheduler
+import com.example.vild.data.BedtimePromptNotifier
 import com.example.vild.data.NightVibeEntry
 import com.example.vild.data.NightVibeLogRepository
 import com.example.vild.data.NightVibeNotifier
 import com.example.vild.data.NightVibeScheduler
 import com.example.vild.data.NightVibeSettings
+import com.example.vild.data.SleepLearning
 import com.example.vild.data.NotificationHelper
 import com.example.vild.data.RealityCheckDayLog
 import com.example.vild.data.RealityCheckRepository
@@ -121,6 +123,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyList(),
+        )
+
+    /** Epoch-ms of the most recent Goodnight confirmation; 0 = not confirmed yet. */
+    val lastBedtime: StateFlow<Long> = nightLogRepo.lastBedtimeFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = 0L,
         )
 
     /** `"day"` or `"night"` — persisted in DataStore. */
@@ -268,6 +278,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Ensure notification channels exist and schedule daily trigger alarm
         NotificationHelper.ensureChannel(application)
         NightVibeNotifier.ensureChannel(application)
+        BedtimePromptNotifier.ensureChannel(application)
         DailyTriggerScheduler.schedule(application)
         // One-time cleanup: the 2026-09-08/09 scheduler bug logged vibes all day;
         // drop those two days so the history starts fresh again.
@@ -298,6 +309,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ── Night vibes API ──────────────────────────────────────────────────────
 
     fun updateIsEnabled(enabled: Boolean) = updateSettings(_settings.value.copy(isEnabled = enabled))
+
+    /**
+     * Stamps "now" as tonight's bedtime anchor — the moment the whole night
+     * schedule (quiet gap + REM pulses) is measured from. Same action as the
+     * Goodnight button on the prompt notification.
+     */
+    fun confirmBedtime() {
+        viewModelScope.launch { NightVibeScheduler.confirmBedtime(getApplication()) }
+    }
+
+    /** Persists the "Going to sleep?" prompt time (minutes-of-day). */
+    fun updateBedtimePrompt(minutesOfDay: Int) =
+        updateSettings(_settings.value.copy(bedtimePromptMinutes = minutesOfDay))
+
+    /** Toggles adaptive sleep-cycle learning on or off. */
+    fun setAdaptiveInterval(enabled: Boolean) =
+        updateSettings(_settings.value.copy(adaptiveInterval = enabled))
+
+    /** Number of annotated pulses waiting to drive the next learning step. */
+    fun pendingFeedbackCount(entries: List<NightVibeEntry>): Int =
+        SleepLearning.pendingCount(entries)
 
     fun updateNightStart(minutesOfDay: Int) =
         updateSettings(_settings.value.copy(nightStartMinutes = minutesOfDay))

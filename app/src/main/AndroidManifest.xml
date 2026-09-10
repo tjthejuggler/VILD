@@ -99,10 +99,28 @@
         <!--
             BroadcastReceiver: drives the night-vibe alarm chain. Posts the
             transient REM-aimed notification (mirrored + vibrated by the
-            paired watch), records the send time, and re-arms itself.
+            paired watch), records the send time, feeds the adaptive
+            interval learner, and re-arms itself.
         -->
         <receiver
             android:name=".ipc.NightVibeReceiver"
+            android:exported="false" />
+
+        <!--
+            BroadcastReceiver: fires the nightly "Going to sleep?" prompt at
+            the configured time; the Goodnight answer anchors tonight's
+            whole vibe schedule.
+        -->
+        <receiver
+            android:name=".ipc.BedtimePromptReceiver"
+            android:exported="false" />
+
+        <!--
+            BroadcastReceiver: handles the "🌙 Goodnight" action button on the
+            bedtime prompt — stamps the bedtime anchor and starts the vibe chain.
+        -->
+        <receiver
+            android:name=".ipc.BedtimeActionReceiver"
             android:exported="false" />
 
         <!--

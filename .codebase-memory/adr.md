@@ -1,14 +1,15 @@
-# ADR: Night-vibe log pollution cleanup & history surface split (2026-09-10)
+# ADR: Bedtime-anchored scheduling + adaptive REM interval learning (2026-09-10)
 
 ## Context
-The 2026-09-08/09 scheduler bug (fixed 2026-09-10T07:03) fired night vibes all day, flooding the `night_vibe_log` DataStore with daytime pulses. The Settings "Previous nights" section showed up to 3 nights inline, and the marker chips ("In dream" / "Woke me") were too wide for a pulse row.
+Night vibes fired on fixed clock times (nightStartMinutes + fixed gap), regardless of when the user actually went to sleep. Users also had to manually tune the cycle length; the ideal interval (the one producing in-dream detections) was never learned from feedback.
 
 ## Decision
-1. **One-time data purge**: `NightVibeLogRepository.purgePollutedDaysOnce()` deletes every entry whose timestamp falls on local dates 2026-09-08 or 2026-09-09, guarded by a `pollution_purge_done_v1` boolean DataStore key so it never runs twice. Invoked once from `MainViewModel.init`.
-2. **History surface split**: Settings screen shows only the **last 2 nights**; the complete history stays in the DataStore (14-day retention) and is reachable via the `NightVibeChartActivity` page, relabelled "Full history & chart". No data is ever deleted by the UI split — display-only truncation.
-3. **Chip labels shortened** for comfortable fit in both surfaces: "In dream" → "Dream", "Woke me" → "Woke". `NightVibeMark` enum values and persisted flags are unchanged (labels are UI-only).
+1. **Goodnight anchor model**: Each evening at a configurable prompt time (`bedtimePromptMinutes`, default 22:30), a "Going to sleep?" notification offers a Goodnight action. Tapping it stamps `bedtimeAnchorMs`. The quiet gap and every REM pulse are measured from that anchor — scheduling is fully relative to real bedtime. `nightEndMinutes` remains a wall-clock cap so late bedtimes can never leak vibes into the day. `nightStartMinutes` is retained only for legacy day/night snapshot deserialization.
+2. **Two-alarm architecture**: independent `setAlarmClock` PendingIntents for the prompt (daily, always armed while enabled) and the vibe chain (armed only when a fresh <20h anchor exists). Wake-up (Day-mode switch) clears the anchor instead of the legacy snooze-based pause.
+3. **Batched adaptive learning** (`SleepLearning`): only deliberately annotated pulses count (`NightVibeEntry.annotated` flag — the Unnoticed default does NOT count); ≥3 annotations required per batch; recency-weighted (0.5^(age/6)); Dream detections dominate → interval moves toward the spacing that produced the dream hit; Woke dominates → interval widens; Unnoticed is neutral. Movement capped at ±10 min/batch, clamped 60–120 min. Learning runs after each vibe fire, toggleable via `adaptiveInterval`.
 
 ## Consequences
-- Users start with a clean history after the bug; older legit history (pre-Sep-8) is preserved.
-- Full historical data remains queryable on the chart page.
-- The purge key remains in DataStore harmlessly; future mass-cleanup needs a new flag version (`_v2`).
+- Users who go to bed at different times get correctly-timed vibes every night.
+- The interval converges toward the user's real dream-detection window as feedback accumulates.
+- Stale anchors (>20h) auto-invalidate, so forgotten phones don't fire a dead chain.
+- Feedback "spent" on a batch still counts in later evaluations (no destructive consumption); the batch gate is only the ≥3-annotation threshold.

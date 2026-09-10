@@ -1,12 +1,22 @@
 # VILD – Vibration Interval Learning Device
 
-> Last updated: 2026-09-10T11:12 UTC
+> Last updated: 2026-09-10T12:50 UTC
 
 A two-module Android project that turns a paired TicWatch (Wear OS) into a mindfulness vibration reminder, controlled from a companion phone app.
 
 **The daily reality check is now the heart of the app:** every morning one of your triggers is chosen, shown immediately on the dream-like main screen, and the app *insists* — with an un-dismissable, self-re-posting notification — until you confirm you have both **read** and **done** the check. Streaks and stats are tracked in the Dream Stats screen. Watch vibration remains as a secondary reminder layer, configured on the Settings screen.
 
 ---
+
+### 2026-09-10T12:50 UTC
+- **Night vibes are now anchored to the user's real bedtime + adaptive interval learning.** No more fixed clock times: the whole schedule is relative to when the user actually goes to sleep.
+  - **New:** [`BedtimePromptNotifier.kt`](app/src/main/java/com/example/vild/data/BedtimePromptNotifier.kt) — nightly "Going to sleep?" notification with a **🌙 Goodnight** action; **New:** [`BedtimeActionReceiver.kt`](app/src/main/java/com/example/vild/ipc/BedtimeActionReceiver.kt) stamps the anchor; **New:** [`BedtimePromptReceiver.kt`](app/src/main/java/com/example/vild/ipc/BedtimePromptReceiver.kt) fires the prompt daily (all registered in [`AndroidManifest.xml`](app/src/main/AndroidManifest.xml)).
+  - [`AppSettingsRepository.kt`](app/src/main/java/com/example/vild/data/AppSettingsRepository.kt): [`NightVibeSettings`](app/src/main/java/com/example/vild/data/AppSettingsRepository.kt:160) gains `bedtimePromptMinutes` (default 22:30, slider up to 01:00), `bedtimeAnchorMs` (epoch-ms of the last Goodnight, 0 = none), and `adaptiveInterval` (default on). `nightStartMinutes` is kept only for legacy JSON snapshots.
+  - [`NightVibeScheduler.kt`](app/src/main/java/com/example/vild/data/NightVibeScheduler.kt): rewritten around the anchor — `nextPromptMs()` arms the daily prompt; `confirmBedtime()` stamps the anchor; `nextVibeMs()` fires vibes only from a fresh (<20 h) anchor: quiet gap measured from bedtime, then one pulse per cycle, hard-capped at the wall-clock `nightEndMinutes` so late bedtimes never leak vibes into the day. `pauseUntilNextNight()` (Day-mode switch) now clears the anchor instead of snoozing. Two independent `setAlarmClock` alarms (prompt + vibe).
+  - **New:** [`SleepLearning.kt`](app/src/main/java/com/example/vild/data/SleepLearning.kt) — adaptive cycle-length tuning. Only deliberately annotated pulses count ([`NightVibeEntry.annotated`](app/src/main/java/com/example/vild/data/NightVibeEntry.kt:25)); needs ≥3 (`MIN_FEEDBACK_ENTRIES`) before acting; recency-weighted (`0.5^(age/6)`); **Dream detections pull the interval toward the spacing that produced them** (the whole goal), Woke pushes it apart (pulses too close to surfacing), Unnoticed is neutral; movement capped at ±10 min per batch, clamped 60–120 min. Applied by [`NightVibeReceiver`](app/src/main/java/com/example/vild/ipc/NightVibeReceiver.kt:83) after each pulse.
+  - [`NightVibeLogRepository.kt`](app/src/main/java/com/example/vild/data/NightVibeLogRepository.kt): `recordBedtime()` + `lastBedtimeFlow` persist the anchor history-side.
+  - [`MainViewModel.kt`](app/src/main/java/com/example/vild/MainViewModel.kt): `confirmBedtime()`, `updateBedtimePrompt()`, `setAdaptiveInterval()`, `lastBedtime` state, prompt channel setup.
+  - [`SettingsScreen.kt`](app/src/main/java/com/example/vild/ui/settings/SettingsScreen.kt:141): "Night starts" slider replaced by **"Bedtime prompt"** time slider (19:00–01:00), live Goodnight status row ("Waiting for tonight's Goodnight" / "Goodnight confirmed · HH:mm" + instant "Goodnight now" button), **"Adapt to my sleep"** toggle with feedback-progress line ("2/3 annotations before the next tune-up"); cycle-length slider locks while adaptive is on. `formatMinutesOfDay` now wraps ≥24 h for the past-midnight prompt times.
 
 ### 2026-09-10T11:12 UTC
 - **Night-vibe log cleanup + history UX polish** (follow-up to the all-day-vibes bug fixed at 07:03):

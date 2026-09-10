@@ -64,13 +64,16 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import com.example.vild.data.SleepLearning
 import java.time.format.DateTimeFormatter
 
 private val nightTimeFormat = DateTimeFormatter.ofPattern("HH:mm")
 
-/** Formats minutes-of-day as HH:mm. */
-private fun formatMinutesOfDay(minutes: Int): String =
-    LocalTime.of(minutes / 60, minutes % 60).format(nightTimeFormat)
+/** Formats minutes-of-day as HH:mm (values ≥ 24 h wrap, e.g. 1470 → "00:30"). */
+private fun formatMinutesOfDay(minutes: Int): String {
+    val wrapped = minutes % (24 * 60)
+    return LocalTime.of(wrapped / 60, wrapped % 60).format(nightTimeFormat)
+}
 
 /**
  * Secondary settings screen — everything that supports the practice but is
@@ -145,9 +148,9 @@ fun SettingsScreen(
                         )
                         Text(
                             "Your paired watch vibrates when these notifications arrive — " +
-                                "no watch app needed. A quiet gap covers the first part of " +
-                                "the night; after that one pulse is sent per sleep cycle, " +
-                                "aimed at REM.",
+                                "no watch app needed. Each evening the app asks if you're " +
+                                "going to sleep; your Goodnight anchors tonight's schedule: " +
+                                "a quiet gap, then one pulse per sleep cycle aimed at REM.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Mist,
                         )
@@ -175,20 +178,47 @@ fun SettingsScreen(
                         }
 
                         Text(
-                            "Night starts · ${formatMinutesOfDay(settings.nightStartMinutes)}",
+                            "Bedtime prompt · ${formatMinutesOfDay(settings.bedtimePromptMinutes)} " +
+                                "(asks \"Going to sleep?\" with a Goodnight button)",
                             style = MaterialTheme.typography.bodySmall,
                             color = Mist,
                         )
                         Slider(
-                            value = settings.nightStartMinutes.toFloat(),
-                            onValueChange = { vm.updateNightStart(it.toInt()) },
-                            valueRange = 18 * 60f..24 * 60f - 15f,
+                            value = settings.bedtimePromptMinutes.toFloat(),
+                            onValueChange = { vm.updateBedtimePrompt((it.toInt() / 15 * 15)) },
+                            valueRange = 19 * 60f..25 * 60f - 15f, // up to 01:00 (25h = next-day 01:00 label via formatMinutesOfDay)
                             modifier = Modifier.fillMaxWidth(),
                         )
 
+                        // Bedtime anchor status
+                        val anchored = settings.bedtimeAnchorMs > 0L
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                if (anchored) "Goodnight confirmed · ${SleepLearning.formatTime(settings.bedtimeAnchorMs)}"
+                                else "Waiting for tonight's Goodnight",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (anchored) AuroraTeal else Mist,
+                            )
+                            OutlinedButton(
+                                onClick = { vm.confirmBedtime() },
+                                modifier = Modifier.height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MoonLavender),
+                            ) {
+                                Text(
+                                    if (anchored) "Re-anchor now" else "Goodnight now",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+
                         Text(
                             "Quiet gap · ${settings.gapMinutes / 60}h ${settings.gapMinutes % 60}m" +
-                                " (no pulses after night starts)",
+                                " (no pulses after Goodnight)",
                             style = MaterialTheme.typography.bodySmall,
                             color = Mist,
                         )
@@ -199,18 +229,53 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                         )
 
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "Adapt to my sleep",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MoonLavender,
+                            )
+                            Switch(
+                                checked = settings.adaptiveInterval,
+                                onCheckedChange = { vm.setAdaptiveInterval(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MoonLavender,
+                                    checkedTrackColor = AuroraTeal.copy(alpha = 0.5f),
+                                ),
+                            )
+                        }
+
                         Text(
                             "Sleep cycle length · ${settings.remIntervalMinutes} min " +
-                                "(one pulse per cycle, aimed at REM)",
+                                (if (settings.adaptiveInterval)
+                                    "(auto-tuned from your Dream/Woke feedback)"
+                                else "(one pulse per cycle, aimed at REM)"),
                             style = MaterialTheme.typography.bodySmall,
                             color = Mist,
                         )
                         Slider(
+                            enabled = !settings.adaptiveInterval,
                             value = settings.remIntervalMinutes.toFloat(),
                             onValueChange = { vm.updateRemInterval((it.toInt() / 5 * 5)) },
-                            valueRange = 60f..120f,
+                            valueRange = SleepLearning.MIN_INTERVAL_MINUTES.toFloat()..
+                                SleepLearning.MAX_INTERVAL_MINUTES.toFloat(),
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        if (settings.adaptiveInterval) {
+                            val pending = vm.pendingFeedbackCount(nightLog)
+                            Text(
+                                if (pending >= SleepLearning.MIN_FEEDBACK_ENTRIES)
+                                    "$pending annotations collected — the next pulse may retune the interval"
+                                else
+                                    "Feedback: $pending/${SleepLearning.MIN_FEEDBACK_ENTRIES} annotations before the next tune-up",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AuroraTeal,
+                            )
+                        }
 
                         Text(
                             "Night ends · ${formatMinutesOfDay(settings.nightEndMinutes)} " +

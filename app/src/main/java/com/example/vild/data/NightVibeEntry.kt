@@ -27,6 +27,8 @@ data class NightVibeEntry(
     val noticed: Boolean = false,
     val inDream: Boolean = false,
     val wokeMeUp: Boolean = false,
+    /** True once the user has deliberately picked a marker (vs. default unnoticed). */
+    val annotated: Boolean = false,
 )
 
 /**
@@ -44,9 +46,9 @@ val NightVibeEntry.mark: NightVibeMark
 
 /** Returns a copy of [entry] with exactly one marker set (radio semantics). */
 fun NightVibeEntry.withMark(mark: NightVibeMark): NightVibeEntry = when (mark) {
-    NightVibeMark.UNNOTICED -> copy(noticed = false, inDream = false, wokeMeUp = false)
-    NightVibeMark.IN_DREAM -> copy(noticed = true, inDream = true, wokeMeUp = false)
-    NightVibeMark.WOKE_ME -> copy(noticed = true, inDream = false, wokeMeUp = true)
+    NightVibeMark.UNNOTICED -> copy(noticed = false, inDream = false, wokeMeUp = false, annotated = true)
+    NightVibeMark.IN_DREAM -> copy(noticed = true, inDream = true, wokeMeUp = false, annotated = true)
+    NightVibeMark.WOKE_ME -> copy(noticed = true, inDream = false, wokeMeUp = true, annotated = true)
 }
 
 /**

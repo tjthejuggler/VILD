@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,7 @@ class NightVibeLogRepository(private val context: Context) {
 
     private val keyEntries = stringPreferencesKey("sent_times_json")
     private val keyPollutionPurgeDone = booleanPreferencesKey("pollution_purge_done_v1")
+    private val keyLastBedtime = longPreferencesKey("last_bedtime_ms")
 
     /** Observe all recorded entries, oldest → newest. */
     val entriesFlow: Flow<List<NightVibeEntry>> = context.nightVibeLogDataStore.data.map { prefs ->
@@ -50,6 +52,21 @@ class NightVibeLogRepository(private val context: Context) {
                 if (it.timestampMs == updated.timestampMs) updated else it
             }
             prefs[keyEntries] = Json.encodeToString(replaced)
+        }
+    }
+
+    /** Epoch-ms of the most recent Goodnight confirmation; 0 if none recorded. */
+    val lastBedtimeFlow: Flow<Long> = context.nightVibeLogDataStore.data.map { prefs ->
+        prefs[keyLastBedtime] ?: 0L
+    }
+
+    /**
+     * Stamps the moment the user tapped **Goodnight** as the bedtime anchor
+     * the whole night schedule is measured from.
+     */
+    suspend fun recordBedtime(timestampMs: Long) {
+        context.nightVibeLogDataStore.edit { prefs ->
+            prefs[keyLastBedtime] = timestampMs
         }
     }
 

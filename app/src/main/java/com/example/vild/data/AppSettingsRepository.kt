@@ -28,6 +28,9 @@ class AppSettingsRepository(private val context: Context) {
 
     private val keyIsEnabled = booleanPreferencesKey("is_enabled")
     private val keyNightStart = intPreferencesKey("night_start_minutes")
+    private val keyBedtimePrompt = intPreferencesKey("bedtime_prompt_minutes")
+    private val keyBedtimeAnchor = longPreferencesKey("bedtime_anchor_ms")
+    private val keyAdaptiveInterval = booleanPreferencesKey("adaptive_interval")
     private val keyGapMinutes = intPreferencesKey("gap_minutes")
     private val keyNightEnd = intPreferencesKey("night_end_minutes")
     private val keyRemInterval = intPreferencesKey("rem_interval_minutes")
@@ -50,6 +53,9 @@ class AppSettingsRepository(private val context: Context) {
         NightVibeSettings(
             isEnabled = prefs[keyIsEnabled] ?: false,
             nightStartMinutes = prefs[keyNightStart] ?: 23 * 60,
+            bedtimePromptMinutes = prefs[keyBedtimePrompt] ?: 22 * 60 + 30,
+            bedtimeAnchorMs = prefs[keyBedtimeAnchor] ?: 0L,
+            adaptiveInterval = prefs[keyAdaptiveInterval] ?: true,
             gapMinutes = prefs[keyGapMinutes] ?: 240,
             nightEndMinutes = prefs[keyNightEnd] ?: 480,
             remIntervalMinutes = prefs[keyRemInterval] ?: 90,
@@ -78,6 +84,9 @@ class AppSettingsRepository(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[keyIsEnabled] = settings.isEnabled
             prefs[keyNightStart] = settings.nightStartMinutes
+            prefs[keyBedtimePrompt] = settings.bedtimePromptMinutes
+            prefs[keyBedtimeAnchor] = settings.bedtimeAnchorMs
+            prefs[keyAdaptiveInterval] = settings.adaptiveInterval
             prefs[keyGapMinutes] = settings.gapMinutes
             prefs[keyNightEnd] = settings.nightEndMinutes
             prefs[keyRemInterval] = settings.remIntervalMinutes
@@ -124,24 +133,38 @@ class AppSettingsRepository(private val context: Context) {
  * The phone posts plain notifications during the night; a paired wearable
  * (e.g. a Garmin watch) mirrors them and vibrates — no wearable-specific code.
  *
- * @property isEnabled           Whether night vibes are armed at all.
- * @property nightStartMinutes    Minutes-of-day when the night window begins (e.g. 23:00 → 1380).
- * @property gapMinutes           Silent gap after [nightStartMinutes] — the first half of the
- *                                night, when REM sleep is sparse. No notifications are sent.
- * @property nightEndMinutes      Minutes-of-day when the night window ends (e.g. 08:00 → 480).
- *                                No vibes are sent after this time — the day belongs to the
- *                                daily reality-check trigger.
- * @property remIntervalMinutes   Estimated sleep-cycle length; after the gap, one notification
- *                                is sent per cycle (aimed at predicted REM sessions).
- *                                The night ends at [nightEndMinutes] — the daytime hours
- *                                stay free of "are you dreaming" vibes.
- * @property snoozeUntilTimestamp Epoch-ms until which night vibes are paused.
+ * Scheduling is anchored to the user's real bedtime: at [bedtimePromptMinutes]
+ * the app asks "Going to sleep?" and tapping **Goodnight** stamps
+ * [bedtimeAnchorMs]. The quiet gap and every REM-targeted pulse are measured
+ * from that anchor — nothing fires at fixed clock times anymore.
+ *
+ * @property isEnabled             Whether night vibes are armed at all.
+ * @property nightStartMinutes     LEGACY (pre-anchor) night start, kept only so
+ *                                 old day/night JSON snapshots still parse.
+ * @property bedtimePromptMinutes  Minutes-of-day when the "Going to sleep?"
+ *                                 prompt fires (may wrap past midnight, e.g. 01:00 → 1500).
+ * @property bedtimeAnchorMs       Epoch-ms of the last confirmed Goodnight; 0 = none yet.
+ *                                 The whole night schedule is relative to this moment.
+ * @property adaptiveInterval      Whether [SleepLearning] may auto-tune
+ *                                 [remIntervalMinutes] from the user's pulse feedback.
+ * @property gapMinutes            Silent gap after the Goodnight anchor — the first
+ *                                 part of the night, when REM sleep is sparse.
+ * @property nightEndMinutes       Minutes-of-day wall-clock cap for the night window
+ *                                 (e.g. 08:00 → 480). No vibes after it, whenever
+ *                                 the user went to bed.
+ * @property remIntervalMinutes    Starting sleep-cycle length; after the gap, one
+ *                                 notification per cycle, aimed at predicted REM.
+ *                                 Auto-tuned by [SleepLearning] when [adaptiveInterval].
+ * @property snoozeUntilTimestamp  Epoch-ms until which night vibes are paused.
  * @property customSnoozeDurations User-defined snooze durations (ms), phone-UI concern only.
  */
 @Serializable
 data class NightVibeSettings(
     val isEnabled: Boolean = false,
     val nightStartMinutes: Int = 23 * 60,
+    val bedtimePromptMinutes: Int = 22 * 60 + 30,
+    val bedtimeAnchorMs: Long = 0L,
+    val adaptiveInterval: Boolean = true,
     val gapMinutes: Int = 240,
     /** Minutes-of-day when the night window ends (e.g. 08:00 → 480). */
     val nightEndMinutes: Int = 480,
