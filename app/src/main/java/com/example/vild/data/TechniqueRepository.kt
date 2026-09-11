@@ -42,6 +42,57 @@ val SEEDED_TECHNIQUES = listOf(
 )
 
 /**
+ * The expanded library, seeded in a second one-time pass so existing installs
+ * receive it too. Sourced from r/LucidDreaming community lists, LucidWiki,
+ * World of Lucid Dreaming, oneironauts.io and The Lucid Guide (LaBerge's
+ * "critical state testing"). No duplicates of [SEEDED_TECHNIQUES].
+ */
+val EXPANDED_TECHNIQUES = listOf(
+    "Pull gently on one finger — dream fingers may stretch or even come off",
+    "Check your pulse at your neck or wrist — dreams rarely bother to simulate one",
+    "Flip a coin and try to stop it mid-air with your mind — dream physics allows it",
+    "Link two fingers into hoops and pull softly — dream touch often goes completely numb",
+    "Draw a mark or letter on your hand — in a dream it may change or vanish when you check",
+    "Play a song or an instrument — dream music skips, loops, or adds sounds from nowhere",
+    "Dunk your face in water and inhale — dream water breathes like air (verify you're awake first!)",
+    "Pull the skin on your arm — dream skin stretches unrealistically far",
+    "Pinch your nose and try to blow out, like popping your ears — dream air flows right through",
+    "Push your hand through a wall or desk — genuinely expect it to sink in",
+    "Try to lift a small object with your mind — dream telekinesis often just works",
+    "Ask another person: am I dreaming? — dream characters often say yes, or hesitate",
+    "Open your phone's home screen, look away, look back — dream apps rearrange themselves",
+    "Try to hover or lift off the ground slightly — willing flight is a classic expectation test",
+    "Stare into a mirror in dim light and expect your face to change — in dreams it will",
+    "Ask: is my body normal? Do I even have one? — dream bodies are approximate",
+    "Pick an object, look away, look back — dream objects move, change, or disappear",
+    "Try to blur or sharpen your vision at will — dream vision obeys expectation",
+    "Look at your phone wallpaper — the dream version is almost never yours",
+    "Listen closely to the background sound — in dreams it crackles, loops, or distorts",
+    "Dial a number or type a message — dream devices garble your input",
+    "Check your clothing twice — dream colors, patterns, and layers refuse to stay consistent",
+    "Study a bookshelf, painting, or poster twice — dream artwork rearranges under attention",
+    "Press on the nearest solid object — dream surfaces may yield or let fingers sink in",
+    "Leave a room and immediately re-enter it — dream layouts rarely survive the trip",
+    "Turn on a faucet — dream water pressure, temperature, and flow misbehave",
+    "Give every check ten genuine seconds — assume you're dreaming until proven awake",
+    "Always pair two checks back-to-back (nose pinch + text) — any single check can fail",
+    "Scan the scene for one impossible thing — dreams always hide at least one",
+    "Ask: does this place make sense? — childhood homes and schools are classic dream sets",
+    "Look for people who shouldn't be there — the departed, celebrities, old classmates",
+    "Watch the people around you — dream characters repeat phrases and act strangely",
+    "Check your shadow — dream shadows detach, lag, or point the wrong way",
+    "Turn a volume dial or thermostat — dream controls barely respond",
+    "Count a handful of coins or bills twice — dream money never adds up the same",
+    "Glance at a calendar or your phone's date twice — dream dates are impossible or shift",
+    "Question the weather — snow in summer or sun at midnight means you're dreaming",
+    "Run a hand over your hair and face — dream length and texture are often wrong",
+    "Try to speak a language you barely know — dream fluency is a giveaway",
+    "Notice your emotions — sudden euphoria or dread with no cause is a dream sign",
+    "Glance at an analog watch — dream hands spin wildly or stand perfectly still",
+    "Toggle your phone's flashlight — the dream beam is weak, absent, or points nowhere",
+)
+
+/**
  * Persists reality check techniques in DataStore as JSON.
  * Same pattern as [AdviceRepository]; additionally seeds the classic
  * methods once on first run.
@@ -50,6 +101,7 @@ class TechniqueRepository(private val context: Context) {
 
     private val keyTechniques = stringPreferencesKey("techniques_json")
     private val keySeeded = booleanPreferencesKey("has_seeded")
+    private val keySeededExpanded = booleanPreferencesKey("has_seeded_expanded_v2")
 
     /** Observe all techniques (reactive). Deduplicates IDs on read. */
     val allTechniquesFlow: Flow<List<TechniqueItem>> = context.techniqueDataStore.data.map { prefs ->
@@ -72,12 +124,36 @@ class TechniqueRepository(private val context: Context) {
         }
     }
 
-    /** Add a new user technique. */
+    /**
+     * Seeds [EXPANDED_TECHNIQUES] in a separate one-time pass (own flag), so
+     * devices that already received the original 20 classics still pick up
+     * the expanded library. Skips entries the user already has (by exact
+     * text) so user-edited or deleted classics are never resurrected.
+     */
+    suspend fun seedExpandedIfAbsent() {
+        context.techniqueDataStore.edit { prefs ->
+            if (prefs[keySeededExpanded] != true) {
+                val current = loadAll(prefs)
+                val known = current.mapTo(mutableSetOf()) { it.text }
+                val missing = EXPANDED_TECHNIQUES
+                    .filterNot { it in known }
+                    .map { TechniqueItem(text = it, isSeeded = true) }
+                if (missing.isNotEmpty()) {
+                    prefs[keyTechniques] = Json.encodeToString(current + missing)
+                }
+                prefs[keySeededExpanded] = true
+            }
+        }
+    }
+
+    /** Add a new user technique, ignoring exact duplicates. */
     suspend fun add(text: String) {
+        val trimmed = text.trim()
         context.techniqueDataStore.edit { prefs ->
             val current = loadAll(prefs)
-            val item = TechniqueItem(text = text.trim(), isSeeded = false)
-            prefs[keyTechniques] = Json.encodeToString(current + item)
+            if (current.none { it.text == trimmed }) {
+                prefs[keyTechniques] = Json.encodeToString(current + TechniqueItem(text = trimmed, isSeeded = false))
+            }
         }
     }
 

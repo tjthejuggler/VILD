@@ -259,9 +259,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             delay(500)
             randomizeAdvice(_activeMode.value)
         }
-        // Seed the classic reality check techniques on first run, then observe
+        // Seed the classic reality check techniques on first run, then observe.
+        // seedExpandedIfAbsent adds the expanded library in its own one-time
+        // pass so existing installs receive it too.
         viewModelScope.launch {
             techniqueRepo.seedIfEmpty()
+            techniqueRepo.seedExpandedIfAbsent()
             techniqueRepo.allTechniquesFlow.collect { list ->
                 _techniqueState.update { old ->
                     val idx = old.currentIndex
@@ -270,6 +273,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        // Seed the daily reality check trigger library once; the `triggers`
+        // StateFlow above picks the list up reactively.
+        viewModelScope.launch { triggerRepo.seedIfEmpty() }
         // Show a random technique on app start
         viewModelScope.launch {
             delay(700)

@@ -1,15 +1,14 @@
-# ADR: Bedtime-anchored scheduling + adaptive REM interval learning (2026-09-10)
+# ADR: Seeded Reality Check Content Libraries (2026-09-11)
 
 ## Context
-Night vibes fired on fixed clock times (nightStartMinutes + fixed gap), regardless of when the user actually went to sleep. Users also had to manually tune the cycle length; the ideal interval (the one producing in-dream detections) was never learned from feedback.
+Users reported too many repeats in "Today's Reality Check" (triggers) and "Reality Check Ideas" (techniques). The technique list had 20 classics; the trigger list shipped empty with a single fallback line.
 
 ## Decision
-1. **Goodnight anchor model**: Each evening at a configurable prompt time (`bedtimePromptMinutes`, default 22:30), a "Going to sleep?" notification offers a Goodnight action. Tapping it stamps `bedtimeAnchorMs`. The quiet gap and every REM pulse are measured from that anchor — scheduling is fully relative to real bedtime. `nightEndMinutes` remains a wall-clock cap so late bedtimes can never leak vibes into the day. `nightStartMinutes` is retained only for legacy day/night snapshot deserialization.
-2. **Two-alarm architecture**: independent `setAlarmClock` PendingIntents for the prompt (daily, always armed while enabled) and the vibe chain (armed only when a fresh <20h anchor exists). Wake-up (Day-mode switch) clears the anchor instead of the legacy snooze-based pause.
-3. **Batched adaptive learning** (`SleepLearning`): only deliberately annotated pulses count (`NightVibeEntry.annotated` flag — the Unnoticed default does NOT count); ≥3 annotations required per batch; recency-weighted (0.5^(age/6)); Dream detections dominate → interval moves toward the spacing that produced the dream hit; Woke dominates → interval widens; Unnoticed is neutral. Movement capped at ±10 min/batch, clamped 60–120 min. Learning runs after each vibe fire, toggleable via `adaptiveInterval`.
+- **Trigger library**: added `SEEDED_TRIGGERS` (50 prompts) in `RealityCheckRepository`, seeded once via `seedIfEmpty()` guarded by a `triggers_seeded` DataStore flag. Prompts are organised by expert practice: LaBerge prospective-memory state tests (doorway/phone/mirror/faucet anchors), false-awakening protocol (check on every waking), dream-sign spotting, physics probes, metacognition.
+- **Technique library**: added `EXPANDED_TECHNIQUES` (42 new checks) in `TechniqueRepository`, seeded via a *separate* `seedExpandedIfAbsent()` pass with its own `has_seeded_expanded_v2` flag so existing installs receive it without violating the "never resurrect deleted classics" guarantee. Sources: r/LucidDreaming community lists, LucidWiki, World of Lucid Dreaming, oneironauts.io, The Lucid Guide.
+- **Duplicate protection**: both repositories' `add()` silently ignore exact-text duplicates; seeders skip texts the user already has.
 
 ## Consequences
-- Users who go to bed at different times get correctly-timed vibes every night.
-- The interval converges toward the user's real dream-detection window as feedback accumulates.
-- Stale anchors (>20h) auto-invalidate, so forgotten phones don't fire a dead chain.
-- Feedback "spent" on a batch still counts in later evaluations (no destructive consumption); the batch gate is only the ≥3-annotation threshold.
+- Idea banner: 62 checks; trigger picker: 50 prompts on first run. Daily variety greatly increased.
+- Seeding stays non-destructive: user edits/deletions always win over seeds (flag-guarded, text-deduped).
+- Future library expansions should follow the same pattern: new list constant + new flag + `seedXIfAbsent()`.

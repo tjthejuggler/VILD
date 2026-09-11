@@ -83,7 +83,8 @@ fun RealityCheckDialog(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Add triggers that will randomly appear as a daily morning notification at 8 AM.",
+                text = "Add triggers that will randomly appear as a daily morning notification at 8 AM. " +
+                    "The app ships with 50 starter prompts — edit or delete any of them.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Grey60,
             )
