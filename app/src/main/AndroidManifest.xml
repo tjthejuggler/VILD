@@ -52,28 +52,14 @@
             android:theme="@style/Theme.VILD" />
 
         <!--
-            BroadcastReceiver: listens for Tail's ACTION_HABIT_INCREMENTED broadcast.
-            When the "auto switch to day mode" setting is enabled and VILD is currently
-            in night mode, this receiver switches to day mode and pushes settings to
-            the watch — even if VILD's UI is not open.
-            Protected by Tail's signature permission so only same-keystore apps can
-            trigger it.
-        -->
-        <receiver
-            android:name=".ipc.DayModeSwitchReceiver"
-            android:exported="true"
-            android:permission="com.example.tail.permission.TAIL_INTEGRATION">
-            <intent-filter>
-                <action android:name="com.example.tail.ACTION_HABIT_INCREMENTED" />
-            </intent-filter>
-        </receiver>
-
-        <!--
             BroadcastReceiver: reverse half of the Tail integration. When Tail
             announces a habit increment (ACTION_HABIT_INCREMENTED) for a habit
             mapped to VILD's READ or DONE slot, the increment is applied to
             VILD's own day log — so increments flow BOTH ways. Echoes of VILD's
             own increments are ignored via the EXTRA_SOURCE tag.
+            ANY non-echo increment doubles as a wake-up signal: the night-vibe
+            chain is paused and the app switches night → day. Protected by
+            Tail's signature permission so only same-keystore apps can trigger it.
         -->
         <receiver
             android:name=".ipc.TailHabitSyncReceiver"
@@ -121,6 +107,24 @@
         -->
         <receiver
             android:name=".ipc.BedtimeActionReceiver"
+            android:exported="false" />
+
+        <!--
+            BroadcastReceiver: fires the "Good morning" prompt at the night-end
+            time — only while last night's cycle is still live (no wake-up
+            signal received yet).
+        -->
+        <receiver
+            android:name=".ipc.MorningPromptReceiver"
+            android:exported="false" />
+
+        <!--
+            BroadcastReceiver: handles the "☀ Good morning" action button on
+            the morning prompt — runs the wake-up sequence (anchor cleared,
+            vibe chain paused, night → day switch).
+        -->
+        <receiver
+            android:name=".ipc.MorningActionReceiver"
             android:exported="false" />
 
         <!--

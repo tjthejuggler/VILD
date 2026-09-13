@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.example.vild.ipc.BedtimePromptReceiver
+import com.example.vild.ipc.MorningPromptReceiver
 import com.example.vild.ipc.NightVibeReceiver
 import java.time.Duration
 import java.time.Instant
@@ -37,9 +38,11 @@ object NightVibeScheduler {
     private const val TAG = "NightVibeScheduler"
     const val ACTION_NIGHT_VIBE = "com.example.vild.ACTION_NIGHT_VIBE"
     const val ACTION_BEDTIME_PROMPT = "com.example.vild.ACTION_BEDTIME_PROMPT"
+    const val ACTION_MORNING_PROMPT = "com.example.vild.ACTION_MORNING_PROMPT"
 
     private const val RC_VIBE = 0
     private const val RC_PROMPT = 1
+    private const val RC_MORNING = 2
 
     /** An anchor older than this is stale (user never woke up via the app). */
     private const val MAX_ANCHOR_AGE_HOURS = 20L
@@ -76,13 +79,24 @@ object NightVibeScheduler {
             alarmManager.cancel(vibePendingIntent(appContext))
             Log.d(TAG, "No vibe armed — waiting for Goodnight")
         }
+
+        // 3. Morning prompt — armed for the next night-end time. Delivery is
+        //    gated by [MorningPromptReceiver]: it only posts while a live
+        //    bedtime anchor exists, i.e. the user has not signalled awake yet.
+        val morningAt = nextPromptMs(LocalDateTime.now(), settings.nightEndMinutes)
+        alarmManager.setAlarmClock(
+            AlarmManager.AlarmClockInfo(morningAt, null),
+            morningPendingIntent(appContext),
+        )
+        Log.d(TAG, "Morning prompt armed for ${format(morningAt)}")
     }
 
-    /** Disarms both alarms. */
+    /** Disarms all alarms (vibe chain, bedtime prompt, morning prompt). */
     fun cancel(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         alarmManager.cancel(vibePendingIntent(context))
         alarmManager.cancel(promptPendingIntent(context))
+        alarmManager.cancel(morningPendingIntent(context))
         Log.d(TAG, "Night vibes disarmed")
     }
 
@@ -186,6 +200,16 @@ object NightVibeScheduler {
         return PendingIntent.getBroadcast(
             context,
             RC_PROMPT,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun morningPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, MorningPromptReceiver::class.java).apply { action = ACTION_MORNING_PROMPT }
+        return PendingIntent.getBroadcast(
+            context,
+            RC_MORNING,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

@@ -89,7 +89,6 @@ fun SettingsScreen(
     val adviceState by vm.adviceState.collectAsState()
     val triggers by vm.triggers.collectAsState()
     val techniqueState by vm.techniqueState.collectAsState()
-    val autoSwitchDayOnHabit by vm.autoSwitchDayOnHabit.collectAsState()
     val tailState by vm.tailState.collectAsState()
 
     var openAdviceSection by remember { mutableStateOf<String?>(null) }
@@ -320,48 +319,6 @@ fun SettingsScreen(
                             onBackfill = { vm.backfillTail() },
                             onDismissMessage = { vm.dismissTailMessage() },
                         )
-                    }
-                }
-            }
-
-            // ── Tail integration ───────────────────────────────────────────────
-            if (vm.isTailInstalled) {
-                item {
-                    GlassCard {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Text("TAIL INTEGRATION", style = MaterialTheme.typography.labelMedium, color = Mist)
-                            Text(
-                                "Automatically switch from Night to Day mode when you record " +
-                                    "a habit in the Tail app (useful as a wake-up signal).",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Mist,
-                            )
-                            HorizontalDivider(color = MoonLavender.copy(alpha = 0.15f))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    "Auto switch to Day on habit",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MoonLavender,
-                                )
-                                Switch(
-                                    checked = autoSwitchDayOnHabit,
-                                    onCheckedChange = { vm.setAutoSwitchDayOnHabit(it) },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = MoonLavender,
-                                        checkedTrackColor = AuroraTeal.copy(alpha = 0.5f),
-                                    ),
-                                )
-                            }
-                        }
                     }
                 }
             }

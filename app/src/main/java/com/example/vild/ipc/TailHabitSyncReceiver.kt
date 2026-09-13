@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.example.vild.data.DayModeSwitcher
 import com.example.vild.data.NagScheduler
 import com.example.vild.data.NotificationHelper
 import com.example.vild.data.RealityCheckDayLog
@@ -68,6 +69,12 @@ class TailHabitSyncReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         scope.launch {
             try {
+                // Wake-up signal: ANY manual habit increment in Tail (this
+                // morning's first one in particular) proves the user is awake.
+                // Runs the shared wake-up sequence — clears the bedtime anchor
+                // so night vibes stop, and switches night → day if needed.
+                DayModeSwitcher.forceDayMode(appContext)
+
                 val tailRepo = TailIntegrationRepository(appContext)
                 val readHabit = tailRepo.getHabitName(Slot.READ)
                 val doneHabit = tailRepo.getHabitName(Slot.DONE)

@@ -1,41 +1,15 @@
-# ADR: Wake-detection fallback via daily dream-trigger acknowledgment
-
-**Date:** 2026-09-12
-**Status:** Accepted
+# ADR: Implied wake-up detection — no wake-up-time setting (2026-09-13)
 
 ## Context
-The night → day mode transition (wake-up signal) previously depended solely on
-Tail's `ACTION_HABIT_INCREMENTED` broadcast received by
-`DayModeSwitchReceiver`. When Tail's broadcast was missed (broken sync, app
-update, process death), VILD remained stuck in night mode and kept posting
-"☾ Dream check" night-vibe notifications during the day.
+Night vibes kept firing after sunrise (2026-09-13 incident): `DayModeSwitcher.forceDayMode` early-returned when the app was already in day mode, skipping the bedtime-anchor clear — the vibe chain stayed armed all morning. The codebase also had a wake-up-time slider and a default-off "auto switch day on habit" toggle, and in-app reality-check taps never signalled wake at all.
 
 ## Decision
-1. Extracted the night → day switch sequence (snapshot night settings, set
-   active mode "day", load day settings, `pauseUntilNextNight`, re-arm
-   scheduler, cancel any live night notification) into the shared
-   `data/DayModeSwitcher.forceDayMode()` object.
-2. `DayModeSwitchReceiver` (Tail broadcast) now delegates to it.
-3. `RealityCheckActionReceiver` now treats ANY tap on the daily dream-trigger
-   notification ("✓ Read" / "✓ Done") as proof of wakefulness and calls the
-   same `forceDayMode()` as a fallback. It also ensures today's log exists
-   before marking, so the fallback works even if the morning alarm failed.
-4. Added `NightVibeNotifier.cancel()` so a stale notification disappears
-   immediately upon wake-up instead of waiting out its 60 s auto-dismiss.
-5. Removed the entire snooze feature per user request: `ui/SnoozeSection.kt`
-   deleted, settings section and imports removed, `snooze()`/`cancelSnooze()`
-   /`addCustomSnoozeDuration()`/`removeCustomSnoozeDuration()` and
-   `snoozeCountdownText` removed from `MainViewModel`,
-   `snoozeUntilTimestamp`/`customSnoozeDurations` removed from
-   `NightVibeSettings` (legacy JSON snapshots simply ignore the removed
-   optional fields, so serialization stays compatible), scheduler/receiver
-   snooze gating dropped.
+1. **Wake-up is implied, never configured.** There is no wake-up-time setting. Any of these signals ends the night: (a) first manual habit increment in Tail (`TailHabitSyncReceiver`), (b) "I read it" / "I did it" tap on the notification (`RealityCheckActionReceiver`), (c) the same taps inside the app (`MainViewModel.markToday`), (d) the "Good morning" button on the new morning prompt (`MorningActionReceiver`), (e) the manual Day/Night toggle.
+2. **`forceDayMode` is the single wake-up sequence** and ALWAYS clears the bedtime anchor + cancels vibe/morning notifications, regardless of active mode; the night→day settings swap happens only when actually in night mode.
+3. **Morning prompt** (`MorningPromptNotifier`, ID 3003, channel `vild_morning_prompt`) is armed daily at the night-end time by `NightVibeScheduler`; `MorningPromptReceiver` gates delivery on "night vibes enabled AND a live bedtime anchor exists" so it never nags an already-awake user.
+4. **No opt-in toggle.** The `autoSwitchDayOnHabit` setting, its flow, and `DayModeSwitchReceiver` were removed; wake-on-Tail-increment is now unconditional (echo-suppressed via EXTRA_SOURCE).
 
 ## Consequences
-- Wake detection no longer has a single point of failure: Tail broadcast OR
-  dream-trigger tap OR manual toggle all converge on `DayModeSwitcher`.
-- The night-vibe chain cannot leak into the day as long as the user
-  acknowledges the daily trigger.
-- NightVibeSettings JSON: removed fields are optional with defaults, so old
-  persisted mode snapshots decode cleanly.
-- Snooze UI/state is gone; `nextVibeMs` is simpler (no snooze interpolation).
+- A stale anchor can no longer outlive a wake-up signal — the morning-vibes bug class is eliminated structurally.
+- The night-end slider remains as the vibe chain's wall-clock backstop; it now also schedules the morning prompt.
+- Any new wake-up source must call `DayModeSwitcher.forceDayMode` to stay consistent.

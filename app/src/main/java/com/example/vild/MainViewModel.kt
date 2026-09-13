@@ -11,6 +11,8 @@ import com.example.vild.data.AdviceItem
 import com.example.vild.data.AdviceRepository
 import com.example.vild.data.AppSettingsRepository
 import com.example.vild.data.DailyTriggerScheduler
+import com.example.vild.data.DayModeSwitcher
+import com.example.vild.data.MorningPromptNotifier
 import com.example.vild.data.NagScheduler
 import com.example.vild.data.BedtimePromptNotifier
 import com.example.vild.data.NightVibeEntry
@@ -146,9 +148,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         false
     }
 
-    private val _autoSwitchDayOnHabit = MutableStateFlow(false)
-    val autoSwitchDayOnHabit: StateFlow<Boolean> = _autoSwitchDayOnHabit.asStateFlow()
-
     private val _tailState = MutableStateFlow(
         TailUiState(
             readHabit = tailRepo.getHabitName(TailIntegrationRepository.Slot.READ),
@@ -210,7 +209,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _activeMode.value = repo.activeModeFlow.first()
             _settings.value = repo.settingsFlow.first()
-            _autoSwitchDayOnHabit.value = repo.autoSwitchDayOnHabitFlow.first()
         }
         // Observe advice for both sections
         AdviceSection.all.forEach { section ->
@@ -260,6 +258,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         NotificationHelper.ensureChannel(application)
         NightVibeNotifier.ensureChannel(application)
         BedtimePromptNotifier.ensureChannel(application)
+        MorningPromptNotifier.ensureChannel(application)
         DailyTriggerScheduler.schedule(application)
         // One-time cleanup: the 2026-09-08/09 scheduler bug logged vibes all day;
         // drop those two days so the history starts fresh again.
@@ -375,14 +374,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Randomize advice for the incoming mode
             randomizeAdvice(incoming)
         }
-    }
-
-    // ── Tail integration API ─────────────────────────────────────────────────
-
-    /** Persists the auto-switch-day-on-habit toggle. */
-    fun setAutoSwitchDayOnHabit(enabled: Boolean) {
-        _autoSwitchDayOnHabit.value = enabled
-        viewModelScope.launch { repo.setAutoSwitchDayOnHabit(enabled) }
     }
 
     // ── Advice API ────────────────────────────────────────────────────────────
@@ -643,6 +634,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (log.isComplete) {
                 NagScheduler.cancel(app)
             }
+            // Wake fallback (in-app path): the tap proves wakefulness — leave
+            // night mode and stop the night-vibe chain just like the
+            // notification-action receiver does.
+            runCatching { DayModeSwitcher.forceDayMode(app) }
         }
     }
 
