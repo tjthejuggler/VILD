@@ -4,13 +4,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.example.vild.data.DayModeSwitcher
 import com.example.vild.data.NagScheduler
 import com.example.vild.data.NotificationHelper
+import com.example.vild.data.RealityCheckRepository
 import com.example.vild.data.RealityCheckStatsRepository
 import com.example.vild.data.TailIntegrationRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private const val TAG = "RealityCheckActionReceiver"
@@ -23,6 +26,11 @@ private const val TAG = "RealityCheckActionReceiver"
  * The notification itself is never cancelled: it lives all day as the home
  * of the repeatable "I read it" / "I did it" actions; only the nagging stops
  * once the day is complete.
+ *
+ * Additionally, any tap on today's dream trigger doubles as the **wake-up
+ * fallback**: if VILD is stuck in night mode because Tail's wake broadcast
+ * never arrived (broken sync, missed alarm, …), the tap itself proves the
+ * user is awake and forces the night → day switch (see [DayModeSwitcher]).
  */
 class RealityCheckActionReceiver : BroadcastReceiver() {
 
@@ -46,6 +54,12 @@ class RealityCheckActionReceiver : BroadcastReceiver() {
             try {
                 val repo = RealityCheckStatsRepository(appContext)
                 val tail = TailIntegrationRepository(appContext)
+
+                // A tap on this notification is itself proof the user is awake,
+                // so make sure today's log exists before marking it.
+                val triggers = RealityCheckRepository(appContext).allTriggersFlow.first()
+                repo.ensureTodayLog(triggers)
+
                 val log = if (action == ACTION_MARK_READ) {
                     // Repeatable by design: every tap bumps readCount and sends
                     // another increment to Tail.
@@ -71,6 +85,10 @@ class RealityCheckActionReceiver : BroadcastReceiver() {
                         NagScheduler.cancel(appContext)
                     }
                 }
+
+                // Wake fallback: the tap proves wakefulness — leave night mode
+                // and stop the night-vibe chain even if Tail never told us.
+                DayModeSwitcher.forceDayMode(appContext)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to mark: ${e.message}", e)
             } finally {

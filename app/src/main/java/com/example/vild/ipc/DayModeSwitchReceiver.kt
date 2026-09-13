@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.example.vild.data.AppSettingsRepository
-import com.example.vild.data.NightVibeScheduler
+import com.example.vild.data.DayModeSwitcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,15 +17,15 @@ private const val TAG = "DayModeSwitchReceiver"
 /**
  * Listens for Tail's `ACTION_HABIT_INCREMENTED` broadcast.
  *
- * When the user has enabled "Auto switch to Day mode on habit" in VILD settings
- * **and** VILD is currently in night mode, this receiver:
- * 1. Saves the current night-mode settings.
- * 2. Switches the active mode to "day".
- * 3. Loads the day-mode settings.
- * 4. Re-arms the night-vibe chain with the day-mode settings.
+ * When the user has enabled "Auto switch to Day mode on habit" in VILD settings,
+ * the habit increment is treated as a wake-up signal and the shared
+ * [DayModeSwitcher] sequence runs: night settings are snapshotted, day mode is
+ * activated, and the night-vibe chain is paused until the next Goodnight.
  *
  * This works even when VILD's UI is not open because manifest-registered
- * receivers are woken by the system.
+ * receivers are woken by the system. If the broadcast is missed, tapping
+ * "I read it" on the daily dream trigger ([RealityCheckActionReceiver])
+ * triggers the same switch as a fallback.
  */
 class DayModeSwitchReceiver : BroadcastReceiver() {
 
@@ -43,35 +43,13 @@ class DayModeSwitchReceiver : BroadcastReceiver() {
             try {
                 val repo = AppSettingsRepository(appContext)
 
-                // Check if the feature is enabled
                 val enabled = repo.autoSwitchDayOnHabitFlow.first()
                 if (!enabled) {
                     Log.d(TAG, "Auto-switch day on habit is disabled — ignoring")
                     return@launch
                 }
 
-                // Check if currently in night mode
-                val currentMode = repo.activeModeFlow.first()
-                if (currentMode != "night") {
-                    Log.d(TAG, "Already in '$currentMode' mode — no switch needed")
-                    return@launch
-                }
-
-                // Save current night settings before switching
-                val currentSettings = repo.settingsFlow.first()
-                repo.saveModeSettings("night", currentSettings)
-
-                // Switch to day mode
-                repo.setActiveMode("day")
-
-                // Load day settings and persist them
-                val daySettings = repo.loadModeSettings("day")
-                repo.save(daySettings)
-                // Switching to day = wake-up: pause vibes until the next night starts.
-                NightVibeScheduler.pauseUntilNextNight(appContext)
-                NightVibeScheduler.scheduleNext(appContext)
-
-                Log.i(TAG, "Switched from night → day mode")
+                DayModeSwitcher.forceDayMode(appContext)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to auto-switch to day mode: ${e.message}", e)
             } finally {

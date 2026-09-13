@@ -50,9 +50,7 @@ class NightVibeReceiver : BroadcastReceiver() {
                     Log.d(TAG, "Night vibes disabled — disarming")
                     NightVibeScheduler.cancel(appContext)
                 } else {
-                    val snoozed = settings.snoozeUntilTimestamp > System.currentTimeMillis()
                     when {
-                        snoozed -> Log.d(TAG, "Skipped (snoozed) — re-arming only")
                         settings.bedtimeAnchorMs <= 0L ->
                             Log.d(TAG, "Skipped (no bedtime anchor yet) — re-arming only")
                         else -> {

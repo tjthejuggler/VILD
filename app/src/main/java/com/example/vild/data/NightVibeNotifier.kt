@@ -71,4 +71,10 @@ object NightVibeNotifier {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(NOTIFICATION_ID, builder.build())
     }
+
+    /** Cancels a live night-vibe notification (e.g. on a wake-up signal). */
+    fun cancel(context: Context) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.cancel(NOTIFICATION_ID)
+    }
 }

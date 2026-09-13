@@ -47,7 +47,6 @@ import com.example.vild.ui.theme.StarGold
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.graphics.Color
 import com.example.vild.data.RealityCheckTrigger
-import com.example.vild.ui.SnoozeSection
 import com.example.vild.ui.advice.AdviceDialog
 import com.example.vild.ui.advice.AdviceSection
 import com.example.vild.ui.dream.DreamBackground
@@ -77,8 +76,8 @@ private fun formatMinutesOfDay(minutes: Int): String {
 
 /**
  * Secondary settings screen — everything that supports the practice but is
- * not the practice itself: night vibes, snooze, advice and reality check
- * trigger management. Floats in glass over the dream sky.
+ * not the practice itself: night vibes, advice and reality check trigger
+ * management. Floats in glass over the dream sky.
  */
 @Composable
 fun SettingsScreen(
@@ -300,21 +299,6 @@ fun SettingsScreen(
                         HorizontalDivider(color = MoonLavender.copy(alpha = 0.15f))
 
                         NightVibeLogSection(settings = settings, entries = nightLog, vm = vm)
-                    }
-                }
-            }
-
-            // ── Snooze ─────────────────────────────────────────────────────────
-            item {
-                GlassCard {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text("SNOOZE", style = MaterialTheme.typography.labelMedium, color = Mist)
-                        SnoozeSection(settings = settings, vm = vm)
                     }
                 }
             }

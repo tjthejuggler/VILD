@@ -102,8 +102,8 @@ object NightVibeScheduler {
 
     /**
      * Ends tonight's vibe chain: clears the anchor so no further vibes fire
-     * until the next *Goodnight*. Called on the wake-up signal (Day-mode
-     * switch), replacing the legacy snooze-based pause.
+     * until the next *Goodnight*. Called on every wake-up signal (Tail habit
+     * broadcast, dream-trigger tap, or manual Day/Night toggle).
      */
     suspend fun pauseUntilNextNight(context: Context) {
         val appContext = context.applicationContext
@@ -148,7 +148,7 @@ object NightVibeScheduler {
     /**
      * Epoch-ms of the next vibe, or `null` when no vibe should currently be
      * armed: no fresh anchor, anchor stale, window over, or everything pushed
-     * past the night-end cap (incl. by a snooze).
+     * past the night-end cap.
      */
     internal fun nextVibeMs(settings: NightVibeSettings, now: LocalDateTime): Long? {
         val anchorValid = settings.bedtimeAnchorMs > 0L &&
@@ -167,19 +167,8 @@ object NightVibeScheduler {
             else -> null // tonight is over — wait for the next Goodnight
         } ?: return null
 
-        // A pending snooze delays the next vibe, but never past the window's end.
-        val snoozeUntil = LocalDateTime.ofInstant(
-            Instant.ofEpochMilli(settings.snoozeUntilTimestamp),
-            ZoneId.systemDefault(),
-        )
-        val effective = if (snoozeUntil > candidate && snoozeUntil < window.morningEnd) {
-            snoozeUntil
-        } else {
-            candidate
-        }
-
-        if (!effective.isAfter(now)) return null
-        return effective.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        if (!candidate.isAfter(now)) return null
+        return candidate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
 
     private fun vibePendingIntent(context: Context): PendingIntent {

@@ -38,7 +38,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -205,30 +204,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = RealityCheckStats(),
         )
 
-    /**
-     * Live countdown text derived from [NightVibeSettings.snoozeUntilTimestamp].
-     * Emits "Snoozed — X min Y sec remaining" while snoozed, null otherwise.
-     * Ticks every second.
-     */
-    val snoozeCountdownText: StateFlow<String?> = flow {
-        while (true) {
-            val until = _settings.value.snoozeUntilTimestamp
-            val remaining = until - System.currentTimeMillis()
-            if (remaining > 0) {
-                val mins = (remaining / 60_000).toInt()
-                val secs = ((remaining % 60_000) / 1_000).toInt()
-                emit("Snoozed — ${mins}m ${secs}s remaining")
-            } else {
-                emit(null)
-            }
-            delay(1_000)
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = null,
-    )
-
     // ── Init ─────────────────────────────────────────────────────────────────
 
     init {
@@ -289,8 +264,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // One-time cleanup: the 2026-09-08/09 scheduler bug logged vibes all day;
         // drop those two days so the history starts fresh again.
         viewModelScope.launch { nightLogRepo.purgePollutedDaysOnce() }
-        // Arm the night-vibe chain and keep it in sync with any settings change
-        // (including snoozes made from other entry points).
+        // Arm the night-vibe chain and keep it in sync with any settings change.
         viewModelScope.launch {
             NightVibeScheduler.scheduleNext(application)
             repo.settingsFlow.collect { saved ->
@@ -367,33 +341,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Persists an edited night-vibe entry (noticed / in-dream / woke-me flags). */
     fun updateNightVibeEntry(entry: NightVibeEntry) {
         viewModelScope.launch { nightLogRepo.updateEntry(entry) }
-    }
-
-    /**
-     * Sets [NightVibeSettings.snoozeUntilTimestamp] to [System.currentTimeMillis] + [durationMs].
-     */
-    fun snooze(durationMs: Long) {
-        val until = System.currentTimeMillis() + durationMs
-        updateSettings(_settings.value.copy(snoozeUntilTimestamp = until))
-    }
-
-    /** Cancels any active snooze by resetting [NightVibeSettings.snoozeUntilTimestamp] to 0. */
-    fun cancelSnooze() {
-        updateSettings(_settings.value.copy(snoozeUntilTimestamp = 0L))
-    }
-
-    /** Adds a custom snooze duration (in ms) if not already present. */
-    fun addCustomSnoozeDuration(durationMs: Long) {
-        val current = _settings.value.customSnoozeDurations
-        if (durationMs !in current) {
-            updateSettings(_settings.value.copy(customSnoozeDurations = current + durationMs))
-        }
-    }
-
-    /** Removes a custom snooze duration (in ms). */
-    fun removeCustomSnoozeDuration(durationMs: Long) {
-        val updated = _settings.value.customSnoozeDurations.filter { it != durationMs }
-        updateSettings(_settings.value.copy(customSnoozeDurations = updated))
     }
 
     // ── Day/Night mode API ───────────────────────────────────────────────────
